@@ -146,6 +146,32 @@ By default, the configuration uses `:latest` tags. For production, pin specific 
    CORS_ORIGINS=https://yourdomain.com
    ```
 
+### Backend URL Configuration
+
+The frontend uses nginx to proxy API requests to the backend. By default, it uses the internal Docker network for communication.
+
+**Single Compose Deployment (Default)**:
+- No configuration needed
+- Frontend and backend communicate internally via `backend:8000`
+- This is the recommended approach
+
+**Separate Service Deployments**:
+If you deploy frontend and backend as separate Dokploy applications:
+
+1. Deploy backend first and note its URL (e.g., `https://api.yourdomain.com`)
+2. In the frontend application, set environment variable:
+   ```bash
+   BACKEND_URL=https://api.yourdomain.com
+   ```
+3. Deploy frontend
+
+**Troubleshooting Backend Connection**:
+- If you see "backend could not be resolved" errors in frontend logs:
+  - Verify `BACKEND_URL` is set correctly
+  - For compose deployments: Use `backend:8000` (default)
+  - For separate deployments: Use full URL with protocol
+  - Check backend service is running and healthy
+
 ### Database Backups
 
 Dokploy provides automatic backups. Configure them:

@@ -65,6 +65,11 @@ services:
     pull_policy: always
     restart: unless-stopped
     
+    environment:
+      # Backend URL for nginx proxy (internal docker network by default)
+      # Override this in Dokploy UI if deploying services separately
+      BACKEND_URL: ${BACKEND_URL:-backend:8000}
+    
     depends_on:
       - backend
 
