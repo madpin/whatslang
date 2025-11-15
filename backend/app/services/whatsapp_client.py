@@ -206,4 +206,41 @@ class WhatsAppClient:
         except Exception as e:
             logger.error(f"Unexpected error getting chat info: {e}")
             return None
+    
+    async def get_all_chats(self) -> List[Dict[str, Any]]:
+        """
+        Fetch all chats from WhatsApp.
+        
+        Returns:
+            List of chat dicts with JID, name, type, and last message timestamp
+        """
+        url = f"{self.base_url}/chats"
+        
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout, auth=self.auth) as client:
+                response = await client.get(url)
+                response.raise_for_status()
+                data = response.json()
+                
+                # Check for success response and extract chats
+                if data.get("code") == "SUCCESS" and "results" in data:
+                    results = data["results"]
+                    # The chats are in results.data
+                    if isinstance(results, dict) and "data" in results:
+                        chats = results["data"]
+                        if isinstance(chats, list):
+                            logger.info(f"Fetched {len(chats)} chats from WhatsApp")
+                            return chats
+                    logger.error(f"Unexpected chats format: {data}")
+                    return []
+                else:
+                    logger.error(f"Failed to get chats: {data}")
+                    return []
+        
+        except httpx.HTTPError as e:
+            logger.error(f"Error fetching chats: {e}")
+            return []
+        except Exception as e:
+            logger.error(f"Unexpected error fetching chats: {e}")
+            return []
 

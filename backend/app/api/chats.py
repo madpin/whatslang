@@ -2,6 +2,7 @@
 
 import logging
 from typing import List, Annotated
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -53,7 +54,7 @@ async def list_chats(
         select(Chat)
         .offset(skip)
         .limit(limit)
-        .order_by(Chat.created_at.desc())
+        .order_by(Chat.last_message_at.desc().nulls_last(), Chat.created_at.desc())
     )
     result = await db.execute(stmt)
     chats = result.scalars().all()
@@ -183,6 +184,79 @@ async def sync_chat(
         logger.info(f"Synced chat: {chat.id}")
     
     return ChatResponse.model_validate(chat)
+
+
+@router.post("/sync-all")
+async def sync_all_chats(
+    db: AsyncSession = Depends(get_db),
+    whatsapp: Annotated[WhatsAppClient, Depends(get_whatsapp_client_dependency)] = None
+):
+    """Sync all chats from WhatsApp"""
+    # Fetch all chats from WhatsApp
+    whatsapp_chats = await whatsapp.get_all_chats()
+    
+    created_count = 0
+    updated_count = 0
+    
+    for wa_chat in whatsapp_chats:
+        jid = wa_chat.get("jid")
+        if not jid:
+            continue
+        
+        name = wa_chat.get("name", "")
+        
+        # Determine chat type
+        chat_type = ChatTypeModel.GROUP if jid.endswith("@g.us") else ChatTypeModel.PRIVATE
+        
+        # Extract last message timestamp if available
+        last_message_at = None
+        if "last_message_time" in wa_chat:
+            try:
+                # Parse ISO 8601 timestamp (e.g., "2025-11-15T20:09:10Z")
+                time_str = wa_chat["last_message_time"]
+                # Remove 'Z' and parse as UTC
+                if time_str.endswith('Z'):
+                    time_str = time_str[:-1] + '+00:00'
+                dt = datetime.fromisoformat(time_str)
+                # Remove timezone info to match database column (TIMESTAMP WITHOUT TIME ZONE)
+                last_message_at = dt.replace(tzinfo=None)
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Failed to parse last message time for {jid}: {e}")
+        
+        # Check if chat exists
+        stmt = select(Chat).where(Chat.jid == jid)
+        result = await db.execute(stmt)
+        existing_chat = result.scalar_one_or_none()
+        
+        if existing_chat:
+            # Update existing chat
+            existing_chat.name = name
+            if last_message_at:
+                existing_chat.last_message_at = last_message_at
+            existing_chat.chat_metadata = {**existing_chat.chat_metadata, **wa_chat}
+            updated_count += 1
+        else:
+            # Create new chat
+            new_chat = Chat(
+                jid=jid,
+                name=name,
+                chat_type=chat_type,
+                chat_metadata=wa_chat,
+                last_message_at=last_message_at
+            )
+            db.add(new_chat)
+            created_count += 1
+    
+    await db.flush()
+    
+    logger.info(f"Synced chats: {created_count} created, {updated_count} updated")
+    
+    return {
+        "message": "Chats synced successfully",
+        "created": created_count,
+        "updated": updated_count,
+        "total": created_count + updated_count
+    }
 
 
 # Bot assignment endpoints

@@ -5,6 +5,7 @@ import {
   createChat,
   updateChat,
   syncChat,
+  syncAllChats,
   getChatBots,
   assignBotToChat,
   updateChatBotAssignment,
@@ -78,6 +79,21 @@ export const useSyncChat = () => {
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.detail || 'Failed to sync chat')
+    },
+  })
+}
+
+export const useSyncAllChats = () => {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: () => syncAllChats(),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['chats'] })
+      toast.success(`Synced ${data.total} chats (${data.created} new, ${data.updated} updated)`)
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.detail || 'Failed to sync chats from WhatsApp')
     },
   })
 }

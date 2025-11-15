@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Eye, RefreshCw } from 'lucide-react'
+import { Plus, Eye, RefreshCw, Download } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -17,7 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { useChats, useCreateChat, useSyncChat } from '@/hooks/useChats'
+import { useChats, useCreateChat, useSyncChat, useSyncAllChats } from '@/hooks/useChats'
 import { formatDate } from '@/lib/utils'
 import type { ChatCreate, ChatType } from '@/types/chat'
 
@@ -25,6 +25,7 @@ export default function Chats() {
   const { data, isLoading } = useChats(30000)
   const createChat = useCreateChat()
   const syncChat = useSyncChat()
+  const syncAllChats = useSyncAllChats()
   const [search, setSearch] = useState('')
   const [showDialog, setShowDialog] = useState(false)
   const [formData, setFormData] = useState<ChatCreate>({
@@ -52,6 +53,10 @@ export default function Chats() {
     syncChat.mutate(id)
   }
 
+  const handleSyncAll = () => {
+    syncAllChats.mutate()
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -61,10 +66,20 @@ export default function Chats() {
             Manage your WhatsApp chats and group assignments
           </p>
         </div>
-        <Button onClick={() => setShowDialog(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Register Chat
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            onClick={handleSyncAll}
+            variant="outline"
+            disabled={syncAllChats.isPending}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            {syncAllChats.isPending ? 'Syncing...' : 'Sync All from WhatsApp'}
+          </Button>
+          <Button onClick={() => setShowDialog(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Register Chat
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -109,7 +124,7 @@ export default function Chats() {
                   <TableHead>Name</TableHead>
                   <TableHead>JID</TableHead>
                   <TableHead>Type</TableHead>
-                  <TableHead>Created</TableHead>
+                  <TableHead>Last Activity</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -130,7 +145,9 @@ export default function Chats() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {formatDate(chat.created_at, 'MMM d, yyyy')}
+                      {chat.last_message_at 
+                        ? formatDate(chat.last_message_at, 'MMM d, yyyy HH:mm')
+                        : formatDate(chat.created_at, 'MMM d, yyyy')}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">

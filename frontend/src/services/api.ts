@@ -78,6 +78,11 @@ export const syncChat = async (id: string): Promise<Chat> => {
   return data
 }
 
+export const syncAllChats = async (): Promise<{ message: string; created: number; updated: number; total: number }> => {
+  const { data } = await api.post('/api/chats/sync-all')
+  return data
+}
+
 // Chat Bot Assignments
 export const getChatBots = async (chatId: string): Promise<ChatBotAssignment[]> => {
   const { data } = await api.get(`/api/chats/${chatId}/bots`)

@@ -1,8 +1,9 @@
 """Chat model"""
 
-from sqlalchemy import String, Enum as SQLEnum, JSON, Index
+from sqlalchemy import String, Enum as SQLEnum, JSON, Index, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import Optional, Dict, Any
+from datetime import datetime
 import enum
 
 from .base import Base, TimestampMixin, generate_uuid
@@ -52,6 +53,13 @@ class Chat(Base, TimestampMixin):
         nullable=False,
         default=dict,
         server_default="{}"
+    )
+    
+    last_message_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime,
+        nullable=True,
+        index=True,
+        comment="Timestamp of the last message from WhatsApp"
     )
     
     # Relationships

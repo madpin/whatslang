@@ -38,6 +38,7 @@ class ChatResponse(ChatBase):
     id: str
     created_at: datetime
     updated_at: datetime
+    last_message_at: Optional[datetime] = None
     
     model_config = {"from_attributes": True}
 
