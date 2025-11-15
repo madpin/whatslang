@@ -39,7 +39,8 @@ COPY . .
 
 # Create non-root user
 RUN useradd -m -u 1000 whatslang && \
-    chown -R whatslang:whatslang /app
+    chown -R whatslang:whatslang /app && \
+    chmod +x /app/entrypoint.sh
 
 # Switch to non-root user
 USER whatslang
@@ -51,6 +52,6 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD python -c "import requests; requests.get('http://localhost:8000/health')" || exit 1
 
-# Run application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run application with entrypoint that runs migrations first
+CMD ["/app/entrypoint.sh"]
 

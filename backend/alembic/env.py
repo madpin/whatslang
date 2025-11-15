@@ -50,14 +50,15 @@ async def run_migrations_online() -> None:
     # Handle both async and sync URLs
     db_url = config.get_main_option("sqlalchemy.url")
     if db_url:
-        if "postgresql://" in db_url:
+        # Only replace if not already using async driver
+        if "postgresql://" in db_url and "postgresql+asyncpg://" not in db_url:
             # For PostgreSQL, use asyncpg for async migrations
             db_url = db_url.replace("postgresql://", "postgresql+asyncpg://")
-        elif "sqlite://" in db_url:
+        elif "sqlite://" in db_url and "sqlite+aiosqlite://" not in db_url:
             # For SQLite, use aiosqlite for async migrations
             db_url = db_url.replace("sqlite://", "sqlite+aiosqlite://")
     
-    configuration = config.get_section(config.config_ini_section)
+    configuration = config.get_section(config.config_ini_section) or {}
     configuration["sqlalchemy.url"] = db_url
     
     connectable = AsyncEngine(

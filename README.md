@@ -90,6 +90,7 @@ export OPENAI_API_KEY=sk-your-api-key-here
 
 ### Backend
 - **[Requirements Guide](backend/REQUIREMENTS.md)** - Understanding Python dependencies
+- **[Migrations Guide](docs/MIGRATIONS.md)** - Database migration management
 
 ## 🔧 Configuration
 
@@ -358,6 +359,20 @@ docker-compose logs --tail=100 backend
 2. Check bot is assigned to chat: `GET /api/chats/{id}/bots`
 3. Review message processor logs
 4. Verify WhatsApp API is receiving messages
+
+### Database Migration Errors
+
+If you see `column does not exist` errors:
+
+```bash
+# Run migrations manually
+docker exec whatslang-backend python run_migrations.py
+
+# Or using Alembic
+docker exec whatslang-backend alembic upgrade head
+```
+
+See [Migrations Guide](docs/MIGRATIONS.md) for detailed migration management.
 
 See [Deployment Guide](docs/DEPLOYMENT.md) for more troubleshooting tips.
 
