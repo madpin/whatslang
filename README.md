@@ -78,7 +78,8 @@ export OPENAI_API_KEY=sk-your-api-key-here
 ## 📖 Documentation
 
 ### Getting Started
-- **[Deployment Guide](docs/DEPLOYMENT.md)** - Deploy to Dokploy, Docker, or production
+- **[Dokploy Deployment Guide](docs/DOKPLOY_DEPLOYMENT.md)** - ⭐ Deploy to Dokploy in 5 minutes
+- **[Deployment Guide](docs/DEPLOYMENT.md)** - Deploy to Docker or production
 - **[Development Guide](docs/DEVELOPMENT.md)** - Local development setup and contributing
 - **[Deployment Checklist](DEPLOYMENT_CHECKLIST.md)** - Pre-deployment verification steps
 - **[CI/CD Pipeline](docs/CI_CD.md)** - Automated builds and container registry
@@ -271,24 +272,29 @@ docker pull ghcr.io/madpin/whatslang/frontend:v1.0.0
 
 See [CI/CD Documentation](docs/CI_CD.md) for details on automated builds and image tags.
 
-### Dokploy Deployment
+### Dokploy Deployment (Easiest!)
 
-1. **Create service in Dokploy** - Select "Docker Compose"
-2. **Connect your Git repository**
-3. **Set environment variables** in Dokploy UI:
-   - `WHATSAPP_BASE_URL`
-   - `WHATSAPP_API_USER` / `WHATSAPP_API_PASSWORD`
-   - `OPENAI_API_KEY`
-   - `DB_PASSWORD`
-4. **Deploy!**
+Deploy using pre-built images from GitHub Container Registry:
+
+1. **Create Compose Application** in Dokploy
+2. **Connect Repository**: `madpin/whatslang`
+3. **Select Compose File**: `docker-compose.dokploy.yml`
+4. **Set Environment Variables**:
+   - `DB_PASSWORD` - Secure database password
+   - `WHATSAPP_API_URL` - Your WhatsApp API endpoint
+   - `WHATSAPP_API_TOKEN` - API token
+   - `OPENAI_API_KEY` - OpenAI API key
+5. **Deploy!**
 
 Dokploy will automatically:
-- Build Docker images
-- Start all services (frontend, backend, database)
-- Configure networking
-- Enable SSL/TLS
+- ✅ Pull pre-built images from GHCR
+- ✅ Start all services (frontend, backend, database)
+- ✅ Configure networking and SSL/TLS
+- ✅ Provide monitoring and logs
 
-See [Deployment Guide](docs/DEPLOYMENT.md) for detailed instructions.
+**Deployment time**: ~2-3 minutes
+
+See [Dokploy Deployment Guide](docs/DOKPLOY_DEPLOYMENT.md) for detailed instructions.
 
 ### Production Docker Compose
 
