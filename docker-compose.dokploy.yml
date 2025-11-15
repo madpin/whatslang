@@ -26,15 +26,9 @@ version: '3.8'
 
 services:
   backend:
-    # Use pre-built image from GitHub Container Registry
     image: ghcr.io/madpin/whatslang/backend:latest
-    # For specific version, use: ghcr.io/madpin/whatslang/backend:v1.0.0
     pull_policy: always
-    
     restart: unless-stopped
-    
-    # ports:
-    #   - "8000:8000"
     
     environment:
       # Database configuration
@@ -64,58 +58,15 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,https://yourdomain.com}
     
     depends_on:
-      postgres:
-        condition: service_healthy
-      
-    
-    healthcheck:
-      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health')"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    
-    # Resource limits for production
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 1G
-        reservations:
-          cpus: '0.5'
-          memory: 512M
+      - postgres
 
   frontend:
-    # Use pre-built image from GitHub Container Registry
     image: ghcr.io/madpin/whatslang/frontend:latest
-    # For specific version, use: ghcr.io/madpin/whatslang/frontend:v1.0.0
     pull_policy: always
-    
     restart: unless-stopped
-    
-    # ports:
-    #   - "3000:80"
     
     depends_on:
       - backend
-    
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 20s
-    
-    # Resource limits
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 256M
-        reservations:
-          cpus: '0.25'
-          memory: 128M
-    
 
   postgres:
     image: postgres:15-alpine
@@ -126,39 +77,9 @@ services:
       POSTGRES_DB: ${DB_NAME:-whatslang}
       POSTGRES_USER: ${DB_USER:-whatslang}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme_insecure_default}
-      
-      # Performance tuning for production
-      POSTGRES_SHARED_BUFFERS: ${POSTGRES_SHARED_BUFFERS:-256MB}
-      POSTGRES_EFFECTIVE_CACHE_SIZE: ${POSTGRES_EFFECTIVE_CACHE_SIZE:-1GB}
-      POSTGRES_MAINTENANCE_WORK_MEM: ${POSTGRES_MAINTENANCE_WORK_MEM:-64MB}
-      POSTGRES_CHECKPOINT_COMPLETION_TARGET: ${POSTGRES_CHECKPOINT_COMPLETION_TARGET:-0.9}
-      POSTGRES_WAL_BUFFERS: ${POSTGRES_WAL_BUFFERS:-16MB}
-      POSTGRES_DEFAULT_STATISTICS_TARGET: ${POSTGRES_DEFAULT_STATISTICS_TARGET:-100}
-      POSTGRES_RANDOM_PAGE_COST: ${POSTGRES_RANDOM_PAGE_COST:-1.1}
-      POSTGRES_EFFECTIVE_IO_CONCURRENCY: ${POSTGRES_EFFECTIVE_IO_CONCURRENCY:-200}
-      POSTGRES_WORK_MEM: ${POSTGRES_WORK_MEM:-4MB}
-      POSTGRES_MIN_WAL_SIZE: ${POSTGRES_MIN_WAL_SIZE:-1GB}
-      POSTGRES_MAX_WAL_SIZE: ${POSTGRES_MAX_WAL_SIZE:-4GB}
     
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    
-    
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-whatslang}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    
-    # Resource limits
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 1G
-        reservations:
-          cpus: '0.5'
-          memory: 512M
 
 volumes:
   postgres_data:
