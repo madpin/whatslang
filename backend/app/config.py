@@ -4,7 +4,7 @@ import json
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field, field_validator
-from typing import Optional, Union, List
+from typing import Optional, Union
 
 
 class Settings(BaseSettings):
@@ -47,12 +47,15 @@ class Settings(BaseSettings):
     reload: bool = False
     
     # CORS
-    cors_origins: Union[List[str], str] = Field(default_factory=lambda: ["*"])
+    cors_origins: list[str] = Field(default_factory=lambda: ["*"])
     
-    @field_validator("cors_origins")
+    @field_validator("cors_origins", mode="before")
     @classmethod
-    def parse_cors_origins(cls, v: Union[str, list[str]]) -> list[str]:
+    def parse_cors_origins(cls, v: Union[str, list[str], None]) -> list[str]:
         """Parse CORS origins from comma-separated string or list"""
+        if v is None:
+            return []
+        
         if isinstance(v, list):
             return [origin.strip() for origin in v if isinstance(origin, str) and origin.strip()]
         
