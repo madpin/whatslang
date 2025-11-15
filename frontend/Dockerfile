@@ -12,6 +12,9 @@ RUN npm install --frozen-lockfile || npm install
 # Copy source code
 COPY . .
 
+# Debug: List files to verify they're copied
+RUN ls -la src/lib/
+
 # Build the application (skip tsc type checking, let Vite handle it)
 RUN npm run build:prod
 
