@@ -21,6 +21,7 @@ services:
     # Use pre-built image from GitHub Container Registry
     image: ghcr.io/madpin/whatslang/backend:latest
     # For specific version, use: ghcr.io/madpin/whatslang/backend:v1.0.0
+    pull_policy: always
     
     restart: unless-stopped
     
@@ -80,6 +81,7 @@ services:
     # Use pre-built image from GitHub Container Registry
     image: ghcr.io/madpin/whatslang/frontend:latest
     # For specific version, use: ghcr.io/madpin/whatslang/frontend:v1.0.0
+    pull_policy: always
     
     restart: unless-stopped
     
@@ -114,6 +116,7 @@ services:
 
   postgres:
     image: postgres:15-alpine
+    pull_policy: always
     restart: unless-stopped
     
     environment:
