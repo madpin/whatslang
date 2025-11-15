@@ -21,11 +21,25 @@ def upgrade() -> None:
     bind = op.get_bind()
     dialect_name = bind.dialect.name
     
-    # Create custom enum types only for PostgreSQL
+    # Create custom enum types only for PostgreSQL (if they don't exist)
     if dialect_name == 'postgresql':
         from sqlalchemy.dialects import postgresql
-        op.execute("CREATE TYPE chat_type_enum AS ENUM ('private', 'group', 'channel')")
-        op.execute("CREATE TYPE schedule_type_enum AS ENUM ('once', 'cron')")
+        # Check and create chat_type_enum if it doesn't exist
+        op.execute("""
+            DO $$ BEGIN
+                CREATE TYPE chat_type_enum AS ENUM ('private', 'group', 'channel');
+            EXCEPTION
+                WHEN duplicate_object THEN null;
+            END $$;
+        """)
+        # Check and create schedule_type_enum if it doesn't exist
+        op.execute("""
+            DO $$ BEGIN
+                CREATE TYPE schedule_type_enum AS ENUM ('once', 'cron');
+            EXCEPTION
+                WHEN duplicate_object THEN null;
+            END $$;
+        """)
     
     # Helper to get JSON type based on dialect
     json_type = sa.JSON() if dialect_name == 'sqlite' else sa.JSON()
