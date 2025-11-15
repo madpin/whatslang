@@ -1,0 +1,149 @@
+# ============================================================================
+# WhatSlang Docker Compose Configuration
+# ============================================================================
+# This configuration is ready for Dokploy deployment
+# 
+# Quick Start:
+#   1. Copy .env.example to .env and configure your credentials
+#   2. Run: docker-compose up -d
+#
+# For production deployment:
+#   docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# See docs/DEPLOYMENT.md for detailed instructions
+# ============================================================================
+
+services:
+  # ==========================================================================
+  # PostgreSQL Database
+  # ==========================================================================
+  # Production-ready PostgreSQL 15 database
+  # Data persists in 'postgres_data' volume
+  # 
+  # To use external database instead:
+  #   1. Comment out this entire service
+  #   2. Set DATABASE_URL in .env to your external database
+  #   3. Remove postgres dependency from backend service
+  # ==========================================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: whatslang-db
+    environment:
+      POSTGRES_USER: whatslang
+      # Set DB_PASSWORD in .env file (required for security)
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-whatslang_password}
+      POSTGRES_DB: whatslang
+    volumes:
+      # Persistent data storage
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      # Expose PostgreSQL port (optional, for external access)
+      # Remove this in production if not needed
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U whatslang"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - whatslang-network
+
+  # ==========================================================================
+  # Backend API (FastAPI)
+  # ==========================================================================
+  # Python FastAPI application with async support
+  # Handles bot management, message processing, and scheduling
+  # 
+  # Environment variables are loaded from .env file
+  # See .env.example for all available options
+  # ==========================================================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: whatslang-backend
+    # Wait for PostgreSQL to be healthy before starting
+    # Comment out if using external database
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # ---- Application Settings ----
+      APP_NAME: WhatSlang
+      DEBUG: ${DEBUG:-false}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      
+      # ---- Database Configuration ----
+      # Uses PostgreSQL container by default
+      # For external database, set full DATABASE_URL in .env
+      DATABASE_URL: postgresql://whatslang:${DB_PASSWORD:-whatslang_password}@postgres:5432/whatslang
+      
+      # ---- WhatsApp API (Required) ----
+      # Your go-whatsapp-web-multidevice API instance
+      WHATSAPP_BASE_URL: ${WHATSAPP_BASE_URL}
+      WHATSAPP_API_USER: ${WHATSAPP_API_USER}
+      WHATSAPP_API_PASSWORD: ${WHATSAPP_API_PASSWORD}
+      
+      # ---- OpenAI/LLM Configuration (Required) ----
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      # Optional: Custom LLM endpoint (LiteLLM, Azure OpenAI, etc.)
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      
+      # ---- Bot Behavior Tuning ----
+      POLL_INTERVAL_SECONDS: ${POLL_INTERVAL_SECONDS:-5}
+      MESSAGE_LIMIT_PER_POLL: ${MESSAGE_LIMIT_PER_POLL:-20}
+      
+      # ---- Server Configuration ----
+      HOST: 0.0.0.0
+      PORT: 8000
+    ports:
+      # Backend API port
+      - "8000:8000"
+    volumes:
+      # Mount source code for development (hot reload)
+      # Remove this in production (use docker-compose.prod.yml)
+      - ./backend:/app
+    networks:
+      - whatslang-network
+    restart: unless-stopped
+
+  # ==========================================================================
+  # Frontend (React + Nginx)
+  # ==========================================================================
+  # React application served by Nginx
+  # Includes API proxy to backend
+  # ==========================================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: whatslang-frontend
+    depends_on:
+      - backend
+    ports:
+      # Frontend web interface
+      - "3000:80"
+    networks:
+      - whatslang-network
+    restart: unless-stopped
+
+# ============================================================================
+# Volumes
+# ============================================================================
+# Persistent storage for PostgreSQL data
+# Backup this volume regularly in production!
+# ============================================================================
+volumes:
+  postgres_data:
+    driver: local
+
+# ============================================================================
+# Networks
+# ============================================================================
+# Internal network for service communication
+# ============================================================================
+networks:
+  whatslang-network:
+    driver: bridge
+

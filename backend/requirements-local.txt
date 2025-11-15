@@ -1,0 +1,31 @@
+# Local development requirements (SQLite only - no PostgreSQL)
+# Compatible with Python 3.11+
+
+# FastAPI and server
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+python-multipart>=0.0.6
+
+# Database (SQLite only)
+sqlalchemy>=2.0.25
+aiosqlite>=0.19.0
+alembic>=1.13.1
+greenlet>=3.0.0  # Required for SQLAlchemy async operations
+
+# Pydantic and validation (flexible versions for compatibility)
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+
+# Scheduling
+apscheduler>=3.10.4
+pytz>=2023.3  # Timezone support for APScheduler
+
+# HTTP client
+httpx>=0.26.0
+
+# LLM
+openai>=1.10.0
+
+# Utilities
+python-dotenv>=1.0.0
+

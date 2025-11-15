@@ -1,0 +1,119 @@
+# Docker Compose configuration using images from GitHub Container Registry
+# This file demonstrates how to use pre-built images instead of building locally
+# 
+# Usage:
+#   1. Authenticate with GitHub Container Registry:
+#      echo $GITHUB_TOKEN | docker login ghcr.io -u <username> --password-stdin
+#   
+#   2. Pull and run the images:
+#      docker-compose -f docker-compose.registry.yml up -d
+#
+# Note: Replace <owner>/<repo> with your actual GitHub repository path
+#       Example: ghcr.io/madpin/whatslang/backend:latest
+
+version: '3.8'
+
+services:
+  backend:
+    # Use pre-built image from GitHub Container Registry
+    image: ghcr.io/madpin/whatslang/backend:latest
+    # Or use a specific version:
+    # image: ghcr.io/madpin/whatslang/backend:v1.0.0
+    # Or use a specific branch:
+    # image: ghcr.io/madpin/whatslang/backend:develop
+    
+    restart: always
+    ports:
+      - "8000:8000"
+    
+    environment:
+      # Database configuration
+      DATABASE_URL: postgresql://whatslang:whatslang@postgres:5432/whatslang
+      
+      # WhatsApp API configuration
+      WHATSAPP_API_URL: ${WHATSAPP_API_URL}
+      WHATSAPP_API_TOKEN: ${WHATSAPP_API_TOKEN}
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID}
+      
+      # LLM configuration
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      
+      # Application settings
+      DEBUG: "false"
+      LOG_LEVEL: "INFO"
+      RELOAD: "false"
+    
+    depends_on:
+      postgres:
+        condition: service_healthy
+    
+    networks:
+      - whatslang-network
+    
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  frontend:
+    # Use pre-built image from GitHub Container Registry
+    image: ghcr.io/madpin/whatslang/frontend:latest
+    # Or use a specific version:
+    # image: ghcr.io/madpin/whatslang/frontend:v1.0.0
+    
+    restart: always
+    ports:
+      - "3000:80"
+    
+    depends_on:
+      - backend
+    
+    networks:
+      - whatslang-network
+    
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  postgres:
+    image: postgres:15-alpine
+    restart: always
+    
+    environment:
+      POSTGRES_DB: whatslang
+      POSTGRES_USER: whatslang
+      POSTGRES_PASSWORD: whatslang
+      # Performance tuning for production
+      POSTGRES_SHARED_BUFFERS: 256MB
+      POSTGRES_EFFECTIVE_CACHE_SIZE: 1GB
+      POSTGRES_MAINTENANCE_WORK_MEM: 64MB
+    
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    
+    networks:
+      - whatslang-network
+    
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U whatslang"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  whatslang-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+    labels:
+      - "backup=true"
+      - "app=whatslang"
+
