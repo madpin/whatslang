@@ -1,6 +1,14 @@
 # Docker Compose configuration for Dokploy deployment
 # This file uses pre-built images from GitHub Container Registry
 #
+# ⚠️ SECURITY WARNING ⚠️
+# This file contains insecure default values to allow containers to start.
+# YOU MUST set proper values in Dokploy's Environment Variables UI:
+# - DB_PASSWORD (currently uses insecure default: changeme_insecure_default)
+# - WHATSAPP_API_URL (REQUIRED for functionality)
+# - WHATSAPP_API_TOKEN or WHATSAPP_API_USER+PASSWORD (REQUIRED)
+# - OPENAI_API_KEY or ANTHROPIC_API_KEY (REQUIRED)
+#
 # Dokploy will automatically:
 # - Pull images from GHCR
 # - Manage environment variables through its UI
@@ -11,7 +19,7 @@
 # 1. Create a new "Compose" application
 # 2. Connect your GitHub repository
 # 3. Select this file as the compose file
-# 4. Set environment variables in Dokploy UI
+# 4. Set environment variables in Dokploy UI (REQUIRED!)
 # 5. Deploy!
 
 version: '3.8'
@@ -30,10 +38,10 @@ services:
     
     environment:
       # Database configuration
-      DATABASE_URL: postgresql://${DB_USER:-whatslang}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-whatslang}
+      DATABASE_URL: postgresql://${DB_USER:-whatslang}:${DB_PASSWORD:-changeme_insecure_default}@postgres:5432/${DB_NAME:-whatslang}
       
       # WhatsApp API configuration (REQUIRED)
-      WHATSAPP_API_URL: ${WHATSAPP_API_URL}
+      WHATSAPP_API_URL: ${WHATSAPP_API_URL:-https://CONFIGURE_YOUR_WHATSAPP_API_URL}
       WHATSAPP_API_TOKEN: ${WHATSAPP_API_TOKEN:-}
       WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
       
@@ -108,11 +116,6 @@ services:
           cpus: '0.25'
           memory: 128M
     
-    # Labels for Dokploy (optional)
-    labels:
-      - "dokploy.domain=${FRONTEND_DOMAIN:-}"
-      - "dokploy.https=true"
-      - "dokploy.https.redirect=true"
 
   postgres:
     image: postgres:15-alpine
@@ -122,7 +125,7 @@ services:
     environment:
       POSTGRES_DB: ${DB_NAME:-whatslang}
       POSTGRES_USER: ${DB_USER:-whatslang}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme_insecure_default}
       
       # Performance tuning for production
       POSTGRES_SHARED_BUFFERS: ${POSTGRES_SHARED_BUFFERS:-256MB}
@@ -160,7 +163,3 @@ services:
 volumes:
   postgres_data:
     driver: local
-    labels:
-      - "backup=true"
-      - "app=whatslang"
-
