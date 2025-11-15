@@ -22,10 +22,10 @@ services:
     image: ghcr.io/madpin/whatslang/backend:latest
     # For specific version, use: ghcr.io/madpin/whatslang/backend:v1.0.0
     
-    restart: always
+    restart: unless-stopped
     
-    ports:
-      - "8000:8000"
+    # ports:
+    #   - "8000:8000"
     
     environment:
       # Database configuration
@@ -43,7 +43,7 @@ services:
       # LLM configuration (at least one required)
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
-      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5-mini}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       
       # Application settings
@@ -57,9 +57,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    
-    networks:
-      - whatslang-network
+      
     
     healthcheck:
       test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health')"]
@@ -83,16 +81,13 @@ services:
     image: ghcr.io/madpin/whatslang/frontend:latest
     # For specific version, use: ghcr.io/madpin/whatslang/frontend:v1.0.0
     
-    restart: always
+    restart: unless-stopped
     
-    ports:
-      - "3000:80"
+    # ports:
+    #   - "3000:80"
     
     depends_on:
       - backend
-    
-    networks:
-      - whatslang-network
     
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/"]
@@ -119,7 +114,7 @@ services:
 
   postgres:
     image: postgres:15-alpine
-    restart: always
+    restart: unless-stopped
     
     environment:
       POSTGRES_DB: ${DB_NAME:-whatslang}
@@ -142,8 +137,6 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     
-    networks:
-      - whatslang-network
     
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-whatslang}"]
@@ -160,10 +153,6 @@ services:
         reservations:
           cpus: '0.5'
           memory: 512M
-
-networks:
-  whatslang-network:
-    driver: bridge
 
 volumes:
   postgres_data:
