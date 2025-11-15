@@ -28,12 +28,15 @@ class Settings(BaseSettings):
     database_echo: bool = False
     
     # WhatsApp API
-    whatsapp_base_url: str
+    whatsapp_base_url: str = Field(
+        default="",
+        validation_alias=AliasChoices("whatsapp_base_url", "WHATSAPP_BASE_URL", "whatsapp_api_url", "WHATSAPP_API_URL"),
+    )
     whatsapp_api_user: Optional[str] = None
     whatsapp_api_password: Optional[str] = None
     
     # OpenAI/LLM
-    openai_api_key: str
+    openai_api_key: str = ""
     openai_base_url: Optional[str] = None
     openai_model: str = "gpt-5-mini"
     
