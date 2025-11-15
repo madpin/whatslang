@@ -1,33 +1,38 @@
-# Multi-stage build for WhatSlang backend
-FROM python:3.11-slim as builder
+# syntax=docker/dockerfile:1.7
+ARG PYTHON_VERSION=3.11-slim
 
-# Set working directory
+FROM python:${PYTHON_VERSION} AS base
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    gcc \
-    postgresql-client \
+RUN --mount=type=cache,target=/var/cache/apt \
+    --mount=type=cache,target=/var/lib/apt \
+    apt-get update && apt-get install -y --no-install-recommends \
+        postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install dependencies
+FROM base AS builder
+RUN --mount=type=cache,target=/var/cache/apt \
+    --mount=type=cache,target=/var/lib/apt \
+    apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        gcc \
+        libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
 
-# Production stage
-FROM python:3.11-slim
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:${PATH}"
 
-# Set working directory
-WORKDIR /app
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --upgrade pip && \
+    pip install -r requirements.txt
 
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y \
-    postgresql-client \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy installed packages from builder (system-wide installation)
-COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
+FROM base AS runtime
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:${PATH}"
 
 # Copy application code
 COPY . .

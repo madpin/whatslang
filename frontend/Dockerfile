@@ -1,32 +1,28 @@
-# Build stage
+# syntax=docker/dockerfile:1.7
+
 FROM node:20-alpine AS builder
+
+# Ensure qemu exposes the CPU features Node expects when cross-building arm64.
+ENV QEMU_CPU=max
 
 WORKDIR /app
 
-# Copy package files
+# Install dependencies using cached npm directory; layer only changes when package lock changes
 COPY package*.json ./
+RUN --mount=type=cache,target=/root/.npm \
+    if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
-# Install dependencies
-RUN npm install --frozen-lockfile || npm install
-
-# Copy source code
+# Copy application source
 COPY . .
 
-# Build the application (skip tsc type checking, let Vite handle it)
-RUN npm run build:prod
+# Build assets
+RUN CI=true npm run build:prod
 
-# Production stage
 FROM nginx:alpine
 
-# Copy built assets from builder
 COPY --from=builder /app/dist /usr/share/nginx/html
-
-# Copy nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Expose port 80
 EXPOSE 80
-
-# Start nginx
 CMD ["nginx", "-g", "daemon off;"]
 
