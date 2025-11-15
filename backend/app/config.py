@@ -3,7 +3,7 @@
 import json
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field, field_validator
+from pydantic import AliasChoices, Field, field_validator
 from typing import Optional, Union
 
 
@@ -47,11 +47,21 @@ class Settings(BaseSettings):
     reload: bool = False
     
     # CORS
-    cors_origins: list[str] = Field(default_factory=lambda: ["*"])
+    cors_origins_raw: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("cors_origins", "CORS_ORIGINS"),
+    )
     
-    @field_validator("cors_origins", mode="before")
+    @field_validator("cors_origins_raw", mode="before")
     @classmethod
-    def parse_cors_origins(cls, v: Union[str, list[str], None]) -> list[str]:
+    def normalize_cors_input(cls, v: Union[str, list[str], None]) -> Union[str, list[str], None]:
+        """Ensure CORS env inputs are consistently formatted"""
+        if isinstance(v, (list, tuple)):
+            return json.dumps([str(origin).strip() for origin in v if str(origin).strip()])
+        return v
+    
+    @staticmethod
+    def parse_cors_origins(v: Union[str, list[str], None]) -> list[str]:
         """Parse CORS origins from comma-separated string or list"""
         if v is None:
             return []
@@ -77,6 +87,12 @@ class Settings(BaseSettings):
             return [origin.strip() for origin in normalized.split(",") if origin.strip()]
         
         raise ValueError("cors_origins must be provided as a string or list of strings")
+    
+    @property
+    def cors_origins(self) -> list[str]:
+        """CORS origins parsed from the raw env value with safe fallback"""
+        parsed = self.parse_cors_origins(self.cors_origins_raw)
+        return parsed if parsed else ["*"]
     
     @property
     def is_development(self) -> bool:
