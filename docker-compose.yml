@@ -119,6 +119,9 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: whatslang-frontend
+    environment:
+      # Backend URL for nginx proxy (internal docker network by default)
+      BACKEND_URL: ${BACKEND_URL:-backend:8000}
     depends_on:
       - backend
     ports:
