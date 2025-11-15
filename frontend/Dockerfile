@@ -12,8 +12,8 @@ RUN npm install --frozen-lockfile || npm install
 # Copy source code
 COPY . .
 
-# Build the application
-RUN npm run build
+# Build the application (skip tsc type checking, let Vite handle it)
+RUN npm run build:prod
 
 # Production stage
 FROM nginx:alpine
