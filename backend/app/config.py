@@ -1,8 +1,10 @@
 """Configuration management using Pydantic Settings"""
 
+import json
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import field_validator
-from typing import Optional, Union
+from pydantic import Field, field_validator
+from typing import Optional, Union, List
 
 
 class Settings(BaseSettings):
@@ -45,16 +47,33 @@ class Settings(BaseSettings):
     reload: bool = False
     
     # CORS
-    cors_origins: list[str] = ["*"]
+    cors_origins: Union[List[str], str] = Field(default_factory=lambda: ["*"])
     
-    @field_validator("cors_origins", mode="before")
+    @field_validator("cors_origins")
     @classmethod
     def parse_cors_origins(cls, v: Union[str, list[str]]) -> list[str]:
         """Parse CORS origins from comma-separated string or list"""
+        if isinstance(v, list):
+            return [origin.strip() for origin in v if isinstance(origin, str) and origin.strip()]
+        
         if isinstance(v, str):
-            # Split by comma and strip whitespace
-            return [origin.strip() for origin in v.split(",") if origin.strip()]
-        return v
+            cleaned = v.strip()
+            if not cleaned:
+                return []
+            
+            # Attempt to parse JSON arrays first (e.g. '["https://a.com"]')
+            if cleaned.startswith("[") and cleaned.endswith("]"):
+                try:
+                    parsed = json.loads(cleaned)
+                    if isinstance(parsed, list):
+                        return [str(origin).strip() for origin in parsed if str(origin).strip()]
+                except json.JSONDecodeError:
+                    pass
+            
+            normalized = cleaned.replace("\n", ",").replace(";", ",")
+            return [origin.strip() for origin in normalized.split(",") if origin.strip()]
+        
+        raise ValueError("cors_origins must be provided as a string or list of strings")
     
     @property
     def is_development(self) -> bool:
