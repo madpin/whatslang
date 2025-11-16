@@ -273,6 +273,16 @@ async def log_requests(request: Request, call_next):
         }
     )
     
+    # Add cache control headers for static files
+    if request.url.path.startswith("/static/"):
+        # No cache for development, short cache for production
+        if ENVIRONMENT == "production":
+            response.headers["Cache-Control"] = "public, max-age=300"  # 5 minutes
+        else:
+            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+    
     return response
 
 # Mount static files for frontend
@@ -285,6 +295,14 @@ if frontend_path.exists():
 async def root():
     """Root endpoint - redirect to frontend dashboard."""
     return RedirectResponse(url="/static/index.html")
+
+
+@app.get("/favicon.ico")
+async def favicon():
+    """Return a simple favicon response to prevent 404 errors."""
+    # Return a 204 No Content response with no body
+    from fastapi.responses import Response
+    return Response(status_code=204)
 
 
 @app.get("/api")
