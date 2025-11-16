@@ -33,7 +33,8 @@ class JokeBot(BotBase):
 The joke should be light-hearted, family-friendly, and not offensive.
 Keep it under 200 characters if possible.
 
-Respond with ONLY the joke, no explanations."""
+Respond with ONLY the joke, no explanations.
+The joke should follow the language of the message."""
         
         # Call LLM to generate joke
         joke = self.llm.call(prompt)
