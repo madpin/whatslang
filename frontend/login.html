@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#6366f1">
+    <title>✨ Enter the Portal - WhatsLang</title>
+    <link rel="stylesheet" href="login.css">
+</head>
+<body>
+    <!-- Animated Background -->
+    <div class="animated-bg">
+        <div class="gradient-orb orb-1"></div>
+        <div class="gradient-orb orb-2"></div>
+        <div class="gradient-orb orb-3"></div>
+        <div class="stars"></div>
+    </div>
+
+    <!-- Particle System -->
+    <canvas id="particles"></canvas>
+
+    <!-- Main Container -->
+    <div class="login-container">
+        <!-- Magic Circle Animation -->
+        <div class="magic-circle">
+            <div class="circle-ring ring-1"></div>
+            <div class="circle-ring ring-2"></div>
+            <div class="circle-ring ring-3"></div>
+            <div class="circle-glow"></div>
+        </div>
+
+        <!-- Login Card -->
+        <div class="login-card">
+            <!-- Logo -->
+            <div class="logo-container">
+                <div class="logo-icon">
+                    <span class="emoji-float">💬</span>
+                </div>
+                <h1 class="app-name">
+                    <span class="letter" style="--i:0">W</span>
+                    <span class="letter" style="--i:1">h</span>
+                    <span class="letter" style="--i:2">a</span>
+                    <span class="letter" style="--i:3">t</span>
+                    <span class="letter" style="--i:4">s</span>
+                    <span class="letter" style="--i:5">L</span>
+                    <span class="letter" style="--i:6">a</span>
+                    <span class="letter" style="--i:7">n</span>
+                    <span class="letter" style="--i:8">g</span>
+                </h1>
+            </div>
+
+            <!-- Subtitle with animation -->
+            <div class="subtitle">
+                <span class="typing-text"></span>
+                <span class="cursor">|</span>
+            </div>
+
+            <!-- Password Form -->
+            <form id="passwordForm" class="password-form">
+                <div class="input-group">
+                    <div class="input-wrapper">
+                        <span class="input-icon">🔐</span>
+                        <input 
+                            type="password" 
+                            id="passwordInput" 
+                            placeholder="Enter the magic password..." 
+                            autocomplete="off"
+                            spellcheck="false"
+                        >
+                        <button type="button" class="toggle-password" id="togglePassword">
+                            <span class="eye-icon">👁️</span>
+                        </button>
+                    </div>
+                    <div class="input-underline"></div>
+                </div>
+
+                <button type="submit" class="submit-btn">
+                    <span class="btn-content">
+                        <span class="btn-text">Enter Portal</span>
+                        <span class="btn-icon">✨</span>
+                    </span>
+                    <div class="btn-glow"></div>
+                </button>
+
+                <!-- Error message -->
+                <div id="errorMessage" class="error-message hidden">
+                    <span class="error-icon">⚠️</span>
+                    <span class="error-text">Invalid password. Try again!</span>
+                </div>
+            </form>
+
+            <!-- Floating Elements -->
+            <div class="floating-elements">
+                <span class="float-emoji" style="--delay: 0s; --x: -20px; --y: -30px;">⭐</span>
+                <span class="float-emoji" style="--delay: 0.5s; --x: 30px; --y: -20px;">✨</span>
+                <span class="float-emoji" style="--delay: 1s; --x: -30px; --y: 20px;">🌟</span>
+                <span class="float-emoji" style="--delay: 1.5s; --x: 25px; --y: 25px;">💫</span>
+                <span class="float-emoji" style="--delay: 2s; --x: -15px; --y: -25px;">⚡</span>
+                <span class="float-emoji" style="--delay: 2.5s; --x: 20px; --y: -35px;">🔮</span>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p class="footer-text">Secured by magic ✨ and encryption 🔐</p>
+        </div>
+    </div>
+
+    <script src="login.js"></script>
+</body>
+</html>
+

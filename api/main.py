@@ -21,6 +21,7 @@ from api.models import (
     BotStatus, BotLogsResponse, ErrorResponse, SuccessResponse,
     Chat, ChatWithBots, BotAssignment, AddChatRequest
 )
+from api import auth
 from core.whatsapp_client import WhatsAppClient
 from core.llm_service import LLMService
 from core.database import MessageDatabase
@@ -285,6 +286,9 @@ async def log_requests(request: Request, call_next):
     
     return response
 
+# Include auth router
+app.include_router(auth.router)
+
 # Mount static files for frontend
 frontend_path = Path(__file__).parent.parent / "frontend"
 if frontend_path.exists():
@@ -293,8 +297,13 @@ if frontend_path.exists():
 
 @app.get("/")
 async def root():
-    """Root endpoint - redirect to frontend dashboard."""
-    return RedirectResponse(url="/static/index.html")
+    """Root endpoint - redirect to login page or dashboard."""
+    # Check if password protection is enabled
+    dashboard_password = os.getenv("DASHBOARD_PASSWORD", "")
+    if dashboard_password:
+        return RedirectResponse(url="/static/login.html")
+    else:
+        return RedirectResponse(url="/static/index.html")
 
 
 @app.get("/favicon.ico")
