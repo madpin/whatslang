@@ -25,6 +25,8 @@ services:
       - POLL_INTERVAL=${POLL_INTERVAL:-5}
       - DB_PATH=${DB_PATH:-/data/messages.db}
     volumes:
+      # Persistent data volume - contains database and any other files that need to survive deployments
+      # In Dokploy, mount this to a host directory for persistence between deployments
       - whatslang-data:/data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -43,6 +45,10 @@ services:
 volumes:
   whatslang-data:
     driver: local
+    # For production/Dokploy: Replace this with a bind mount to a host directory
+    # Example: 
+    #   volumes:
+    #     - /path/on/host/whatslang-data:/data
 
 networks:
   whatslang-network:

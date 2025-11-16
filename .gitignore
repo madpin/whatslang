@@ -31,6 +31,13 @@ ENV/
 *.sqlite
 *.sqlite3
 
+# Persistent data directory
+data/*
+!data/.gitkeep
+
+# Database backups
+backups/
+
 # IDE
 .vscode/
 .idea/

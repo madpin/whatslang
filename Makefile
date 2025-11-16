@@ -1,7 +1,7 @@
 # Makefile for WhatsApp Bot Service
 # Provides convenient commands for development and deployment
 
-.PHONY: help install dev run docker-build docker-run docker-stop clean test lint format
+.PHONY: help install dev run docker-build docker-run docker-stop clean test lint format backup backup-docker restore
 
 # Default target
 help:
@@ -32,6 +32,12 @@ help:
 	@echo ""
 	@echo "Utilities:"
 	@echo "  make clean        Clean up generated files"
+	@echo ""
+	@echo "Database:"
+	@echo "  make backup        Backup local database"
+	@echo "  make backup-docker Backup database from Docker container"
+	@echo "  make restore       List and restore backups"
+	@echo "  make db-reset      Delete database (with confirmation)"
 	@echo ""
 
 # Development setup
@@ -167,12 +173,41 @@ clean:
 	@echo "✓ Cleanup complete"
 
 # Database management
+backup:
+	@echo "Creating database backup..."
+	@mkdir -p backups
+	@if [ -f data/messages.db ]; then \
+		TIMESTAMP=$$(date +%Y%m%d_%H%M%S); \
+		cp data/messages.db backups/messages_$$TIMESTAMP.db; \
+		sqlite3 data/messages.db .dump | gzip > backups/messages_$$TIMESTAMP.sql.gz; \
+		echo "✓ Backup created:"; \
+		echo "  - backups/messages_$$TIMESTAMP.db"; \
+		echo "  - backups/messages_$$TIMESTAMP.sql.gz"; \
+	else \
+		echo "✗ No database file found at data/messages.db"; \
+		exit 1; \
+	fi
+
+backup-docker:
+	@echo "Creating database backup from Docker container..."
+	@mkdir -p backups
+	@TIMESTAMP=$$(date +%Y%m%d_%H%M%S); \
+	docker exec whatslang-bot-service sqlite3 /data/messages.db .dump | gzip > backups/messages_$$TIMESTAMP.sql.gz; \
+	echo "✓ Backup created: backups/messages_$$TIMESTAMP.sql.gz"
+
+restore:
+	@echo "Available backups:"
+	@ls -lh backups/*.sql.gz 2>/dev/null || echo "No backups found"
+	@echo ""
+	@echo "To restore a backup, run:"
+	@echo "  zcat backups/messages_TIMESTAMP.sql.gz | sqlite3 data/messages.db"
+
 db-reset:
 	@echo "⚠️  This will delete the message database!"
 	@read -p "Are you sure? [y/N] " -n 1 -r; \
 	echo; \
 	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
-		rm -f messages.db; \
+		rm -f data/messages.db; \
 		echo "✓ Database deleted"; \
 	else \
 		echo "Cancelled"; \

@@ -162,6 +162,36 @@ Dokploy automatically detects and uses the `nixpacks.toml` configuration.
    - Liveness: `GET /health`
    - Readiness: `GET /ready`
 
+## 💾 Data Persistence
+
+All persistent data is stored in the `/data` directory (inside containers) or `./data/` (local development).
+
+### What is Persisted?
+
+- **Database** (`messages.db`) - Chat history, bot assignments, processed messages
+- **Future assets** - Logs, cached data, uploads, etc.
+
+### Dokploy Volume Setup
+
+In Dokploy's volume configuration:
+- **Container Path**: `/data`
+- **Host Path**: `/var/lib/dokploy/volumes/whatslang/data` (or your preferred location)
+- **Mode**: `rw` (read-write)
+
+This ensures your data survives redeployments, updates, and container restarts.
+
+### Backup & Restore
+
+```bash
+# Backup
+docker exec whatslang-bot-service sqlite3 /data/messages.db .dump > backup.sql
+
+# Restore
+cat backup.sql | docker exec -i whatslang-bot-service sqlite3 /data/messages.db
+```
+
+**📖 For detailed persistence documentation**, see [PERSISTENCE.md](PERSISTENCE.md)
+
 ## 📋 Architecture
 
 ```
@@ -178,6 +208,8 @@ whatslang/
 │   ├── whatsapp_client.py # WhatsApp API wrapper
 │   ├── database.py        # SQLite message tracking
 │   └── llm_service.py     # LLM API wrapper
+├── data/                  # Persistent data (gitignored)
+│   └── messages.db        # SQLite database
 ├── frontend/              # Web dashboard
 │   ├── index.html         # Dashboard UI
 │   ├── app.js            # Frontend logic
@@ -188,6 +220,7 @@ whatslang/
 ├── pyproject.toml        # Python project metadata
 ├── requirements.txt      # Python dependencies
 ├── env.example          # Environment variables template
+├── PERSISTENCE.md        # Data persistence guide
 └── run.py               # Simple run script
 ```
 
@@ -254,7 +287,7 @@ Restart the service - your bot will automatically appear in the dashboard!
 | `OPENAI_BASE_URL` | No | `https://api.openai.com/v1` | LLM API endpoint |
 | `OPENAI_MODEL` | No | `gpt-4` | LLM model name |
 | `POLL_INTERVAL` | No | `5` | Message polling interval (seconds) |
-| `DB_PATH` | No | `messages.db` | SQLite database path |
+| `DB_PATH` | No | `data/messages.db` | SQLite database path |
 | `HOST` | No | `0.0.0.0` | Server host |
 | `PORT` | No | `8000` | Server port |
 | `LOG_LEVEL` | No | `INFO` | Logging level |
