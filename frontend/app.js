@@ -537,7 +537,7 @@ function createChatCard(chat) {
                         <div class="chat-name">${escapeHtml(chat.chat_name)}</div>
                     <div class="chat-jid">${chat.chat_jid}</div>
                     </div>
-                    <button class="chat-expand-btn" onclick="event.stopPropagation();">
+                    <button class="chat-expand-btn" onclick="toggleChat('${escapeAttr(chat.chat_jid)}')">
                         ▼
                     </button>
                 </div>
