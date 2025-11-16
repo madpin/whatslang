@@ -201,26 +201,41 @@ class MessageDatabase:
         cursor = conn.cursor()
         
         # Build query with filters
-        query = "SELECT * FROM chats WHERE 1=1"
+        # Use DISTINCT when filtering by bot status to avoid duplicates from JOIN
+        if bot_status_filter:
+            query = "SELECT DISTINCT chats.* FROM chats"
+        else:
+            query = "SELECT * FROM chats"
+        
+        # Bot status filter requires a JOIN
+        if bot_status_filter == "running":
+            query += " INNER JOIN bot_chat_assignments ON chats.chat_jid = bot_chat_assignments.chat_jid"
+            query += " WHERE bot_chat_assignments.running = 1"
+        elif bot_status_filter == "none":
+            query += " LEFT JOIN bot_chat_assignments ON chats.chat_jid = bot_chat_assignments.chat_jid"
+            query += " WHERE bot_chat_assignments.chat_jid IS NULL"
+        else:
+            query += " WHERE 1=1"
+        
         params = []
         
         # Activity filter
         if activity_filter == "active":
-            query += " AND last_message_time >= datetime('now', '-1 day')"
+            query += " AND chats.last_message_time >= datetime('now', '-1 day')"
         elif activity_filter == "recent":
-            query += " AND last_message_time >= datetime('now', '-7 days')"
+            query += " AND chats.last_message_time >= datetime('now', '-7 days')"
         elif activity_filter == "idle":
-            query += " AND (last_message_time IS NULL OR last_message_time < datetime('now', '-7 days'))"
+            query += " AND (chats.last_message_time IS NULL OR chats.last_message_time < datetime('now', '-7 days'))"
         
         # Chat type filter
         if chat_type_filter == "group":
-            query += " AND chat_jid LIKE '%@g.us'"
+            query += " AND chats.chat_jid LIKE '%@g.us'"
         elif chat_type_filter == "individual":
-            query += " AND chat_jid NOT LIKE '%@g.us'"
+            query += " AND chats.chat_jid NOT LIKE '%@g.us'"
         
         # Search filter
         if search:
-            query += " AND (chat_name LIKE ? OR chat_jid LIKE ?)"
+            query += " AND (chats.chat_name LIKE ? OR chats.chat_jid LIKE ?)"
             search_term = f"%{search}%"
             params.extend([search_term, search_term])
         
@@ -229,14 +244,17 @@ class MessageDatabase:
         if sort_by not in valid_sort_fields:
             sort_by = "last_message_time"
         
+        # Prefix sort field with table name when using JOINs
+        sort_field = f"chats.{sort_by}" if bot_status_filter else sort_by
+        
         # Handle NULL values in last_message_time (put them at the end)
         if sort_by == "last_message_time":
             if order.lower() == "desc":
-                query += f" ORDER BY {sort_by} DESC NULLS LAST"
+                query += f" ORDER BY {sort_field} DESC NULLS LAST"
             else:
-                query += f" ORDER BY {sort_by} ASC NULLS LAST"
+                query += f" ORDER BY {sort_field} ASC NULLS LAST"
         else:
-            query += f" ORDER BY {sort_by} {order.upper()}"
+            query += f" ORDER BY {sort_field} {order.upper()}"
         
         # Pagination
         if limit is not None:
@@ -309,26 +327,42 @@ class MessageDatabase:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        query = "SELECT COUNT(*) FROM chats WHERE 1=1"
+        # Build query with filters
+        # Use DISTINCT when filtering by bot status to avoid duplicates from JOIN
+        if bot_status_filter:
+            query = "SELECT COUNT(DISTINCT chats.chat_jid) FROM chats"
+        else:
+            query = "SELECT COUNT(*) FROM chats"
+        
+        # Bot status filter requires a JOIN
+        if bot_status_filter == "running":
+            query += " INNER JOIN bot_chat_assignments ON chats.chat_jid = bot_chat_assignments.chat_jid"
+            query += " WHERE bot_chat_assignments.running = 1"
+        elif bot_status_filter == "none":
+            query += " LEFT JOIN bot_chat_assignments ON chats.chat_jid = bot_chat_assignments.chat_jid"
+            query += " WHERE bot_chat_assignments.chat_jid IS NULL"
+        else:
+            query += " WHERE 1=1"
+        
         params = []
         
         # Activity filter
         if activity_filter == "active":
-            query += " AND last_message_time >= datetime('now', '-1 day')"
+            query += " AND chats.last_message_time >= datetime('now', '-1 day')"
         elif activity_filter == "recent":
-            query += " AND last_message_time >= datetime('now', '-7 days')"
+            query += " AND chats.last_message_time >= datetime('now', '-7 days')"
         elif activity_filter == "idle":
-            query += " AND (last_message_time IS NULL OR last_message_time < datetime('now', '-7 days'))"
+            query += " AND (chats.last_message_time IS NULL OR chats.last_message_time < datetime('now', '-7 days'))"
         
         # Chat type filter
         if chat_type_filter == "group":
-            query += " AND chat_jid LIKE '%@g.us'"
+            query += " AND chats.chat_jid LIKE '%@g.us'"
         elif chat_type_filter == "individual":
-            query += " AND chat_jid NOT LIKE '%@g.us'"
+            query += " AND chats.chat_jid NOT LIKE '%@g.us'"
         
         # Search filter
         if search:
-            query += " AND (chat_name LIKE ? OR chat_jid LIKE ?)"
+            query += " AND (chats.chat_name LIKE ? OR chats.chat_jid LIKE ?)"
             search_term = f"%{search}%"
             params.extend([search_term, search_term])
         

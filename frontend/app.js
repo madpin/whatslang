@@ -4,7 +4,7 @@
 // ===================================
 
 const API_BASE_URL = window.location.origin;
-const REFRESH_INTERVAL = 10000; // 10 seconds
+const REFRESH_INTERVAL = 30000; // 30 seconds
 
 // State management
 const state = {
@@ -518,6 +518,11 @@ async function loadChatsQuietly() {
         } else {
             params.append('per_page', 10000);
             params.append('page', 1);
+            // Apply filters to cards mode as well
+            if (state.filters.activity) params.append('activity', state.filters.activity);
+            if (state.filters.chatType) params.append('chat_type', state.filters.chatType);
+            if (state.filters.botStatus) params.append('bot_status', state.filters.botStatus);
+            if (state.filters.search) params.append('search', state.filters.search);
         }
         
         const response = await authenticatedFetch(`${API_BASE_URL}/chats?${params}`);
@@ -687,7 +692,7 @@ function createChatCard(chat) {
                         <div class="chat-name">${escapeHtml(chat.chat_name)}</div>
                     <div class="chat-jid">${chat.chat_jid}</div>
                     </div>
-                    <button class="chat-expand-btn" onclick="toggleChat('${escapeAttr(chat.chat_jid)}')">
+                    <button class="chat-expand-btn" onclick="event.stopPropagation(); toggleChat('${escapeAttr(chat.chat_jid)}')">
                         ▼
                     </button>
                 </div>

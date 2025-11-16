@@ -460,8 +460,8 @@ async def get_stats():
         available_bot_types = set()
         
         for bot_status in all_bot_statuses:
-            available_bot_types.add(bot_status.name)
-            if bot_status.status == 'running':
+            available_bot_types.add(bot_status['name'])
+            if bot_status['status'] == 'running':
                 running_bots += 1
             else:
                 stopped_bots += 1
