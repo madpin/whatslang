@@ -348,10 +348,15 @@ async function loadChats() {
             // Old format for backward compatibility
             state.chats = data;
             state.allChatsData = null;
-        } else {
+        } else if (data && typeof data === 'object') {
             // New paginated format
-            state.chats = data.chats || [];
+            state.chats = Array.isArray(data.chats) ? data.chats : [];
             state.allChatsData = data;
+        } else {
+            // Unexpected format - default to empty array
+            console.error('Unexpected data format:', data);
+            state.chats = [];
+            state.allChatsData = null;
         }
         
         console.log('✓ Loaded chats:', state.chats.length);
@@ -382,10 +387,21 @@ async function loadChatsQuietly() {
         const response = await fetch(`${API_BASE_URL}/chats`);
         if (!response.ok) return;
         
-        const chats = await response.json();
+        const data = await response.json();
+        
+        // Handle both old format (array) and new format (object with pagination)
+        let chats = [];
+        if (Array.isArray(data)) {
+            chats = data;
+        } else if (data && typeof data === 'object' && Array.isArray(data.chats)) {
+            chats = data.chats;
+        } else {
+            console.error('Unexpected data format in loadChatsQuietly:', data);
+            return;
+        }
         
         // Check if chat list changed
-        const currentChatIds = state.chats.map(c => c.chat_jid).sort();
+        const currentChatIds = (state.chats || []).map(c => c.chat_jid).sort();
         const newChatIds = chats.map(c => c.chat_jid).sort();
         
         const chatsChanged = JSON.stringify(currentChatIds) !== JSON.stringify(newChatIds);
@@ -409,6 +425,12 @@ async function loadChatsQuietly() {
 // ===================================
 
 function updateDashboardStats() {
+    // Ensure state.chats is an array
+    if (!Array.isArray(state.chats)) {
+        console.error('state.chats is not an array:', state.chats);
+        state.chats = [];
+    }
+    
     const totalChats = state.chats.length;
     let runningBots = 0;
     let enabledBots = 0;
@@ -449,6 +471,12 @@ function displayChats(chats) {
     const titleElement = sectionHeaderBar?.querySelector('.section-title-large');
     if (titleElement) {
         titleElement.textContent = 'Your Chats';
+    }
+    
+    // Ensure chats is an array
+    if (!Array.isArray(chats)) {
+        console.error('displayChats received non-array:', chats);
+        chats = [];
     }
     
     const filteredChats = state.searchQuery 
@@ -631,6 +659,12 @@ function createBotCard(bot, chatJid) {
 }
 
 function updateBotStatuses(chats) {
+    // Ensure chats is an array
+    if (!Array.isArray(chats)) {
+        console.error('updateBotStatuses received non-array:', chats);
+        return;
+    }
+    
     chats.forEach(chat => {
         chat.bots?.forEach(bot => {
             const botCard = document.querySelector(`[data-bot-name="${bot.name}"][data-chat-jid="${chat.chat_jid}"]`);
@@ -1119,6 +1153,12 @@ function displayBotsView() {
     const titleElement = sectionHeaderBar.querySelector('.section-title-large');
     if (titleElement) {
         titleElement.textContent = 'All Bots';
+    }
+    
+    // Ensure state.chats is an array
+    if (!Array.isArray(state.chats)) {
+        console.error('state.chats is not an array in displayBotsView:', state.chats);
+        state.chats = [];
     }
     
     // Collect all bots from all chats
