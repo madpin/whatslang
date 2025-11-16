@@ -24,6 +24,15 @@ const state = {
 async function init() {
     console.log('🚀 Initializing modern dashboard...');
     
+    // Expose functions to global scope for inline onclick handlers
+    window.startBot = startBot;
+    window.stopBot = stopBot;
+    window.toggleLogs = toggleLogs;
+    window.toggleBotAssignment = toggleBotAssignment;
+    window.toggleChat = toggleChat;
+    window.toggleMessages = toggleMessages;
+    window.deleteChat = deleteChat;
+    
     setupEventListeners();
     await loadChats();
     startAutoRefresh();
@@ -86,6 +95,37 @@ function setupEventListeners() {
     });
     document.getElementById('manualChatName')?.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') addChatManually();
+    });
+    
+    // Event delegation for bot action buttons (more reliable than inline onclick)
+    document.addEventListener('click', (e) => {
+        const target = e.target.closest('.bot-btn');
+        if (!target) return;
+        
+        const botCard = target.closest('[data-bot-name][data-chat-jid]');
+        if (!botCard) {
+            console.error('Bot card not found for button:', target);
+            return;
+        }
+        
+        const botName = botCard.dataset.botName;
+        const chatJid = botCard.dataset.chatJid;
+        
+        console.log('Bot button clicked:', { botName, chatJid, classList: target.classList.toString() });
+        
+        if (target.classList.contains('start')) {
+            e.preventDefault();
+            e.stopPropagation();
+            startBot(botName, chatJid);
+        } else if (target.classList.contains('stop')) {
+            e.preventDefault();
+            e.stopPropagation();
+            stopBot(botName, chatJid);
+        } else if (target.classList.contains('logs')) {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleLogs(botName, chatJid);
+        }
     });
 }
 
