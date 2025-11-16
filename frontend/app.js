@@ -271,14 +271,15 @@ function setupEventListeners() {
         if (e.key === 'Enter') addChatManually();
     });
     
-    // Event delegation for bot action buttons (more reliable than inline onclick)
+    // Event delegation for bot action buttons (fallback for cards view)
+    // Note: Table view uses inline onclick handlers
     document.addEventListener('click', (e) => {
         const target = e.target.closest('.bot-btn');
         if (!target) return;
         
         const botCard = target.closest('[data-bot-name][data-chat-jid]');
         if (!botCard) {
-            console.error('Bot card not found for button:', target);
+            // Skip if no bot card found - likely using inline onclick handler
             return;
         }
         
@@ -1073,21 +1074,6 @@ async function toggleBotAssignment(botName, chatJid, enabled) {
 async function startBot(botName, chatJid) {
     console.log('startBot called:', { botName, chatJid });
     
-    const botCard = document.querySelector(`[data-bot-name="${botName}"][data-chat-jid="${chatJid}"]`);
-    const startBtn = botCard?.querySelector('.bot-btn.start');
-    const originalHtml = startBtn?.innerHTML || '▶️';
-    
-    if (!botCard) {
-        console.error('Bot card not found:', { botName, chatJid });
-        showToast('Bot card not found', 'error');
-        return;
-    }
-    
-    if (startBtn) {
-        startBtn.disabled = true;
-        startBtn.innerHTML = '<span class="loading-spinner"></span>';
-    }
-    
     try {
         const url = `${API_BASE_URL}/bots/${encodeURIComponent(botName)}/start?chat_jid=${encodeURIComponent(chatJid)}`;
         console.log('Starting bot with URL:', url);
@@ -1105,25 +1091,10 @@ async function startBot(botName, chatJid) {
     } catch (error) {
         console.error(`Error starting bot ${botName}:`, error);
         showToast(`Failed to start bot: ${error.message}`, 'error');
-        
-        // Reset button state on error
-        if (startBtn) {
-            startBtn.innerHTML = originalHtml;
-            startBtn.disabled = false;
-        }
     }
 }
 
 async function stopBot(botName, chatJid) {
-    const botCard = document.querySelector(`[data-bot-name="${botName}"][data-chat-jid="${chatJid}"]`);
-    const stopBtn = botCard?.querySelector('.bot-btn.stop');
-    const originalHtml = stopBtn?.innerHTML || '⏹️';
-    
-    if (stopBtn) {
-        stopBtn.disabled = true;
-        stopBtn.innerHTML = '<span class="loading-spinner"></span>';
-    }
-    
     try {
         const response = await fetch(
             `${API_BASE_URL}/bots/${encodeURIComponent(botName)}/stop?chat_jid=${encodeURIComponent(chatJid)}`,
@@ -1144,13 +1115,7 @@ async function stopBot(botName, chatJid) {
         
     } catch (error) {
         console.error(`Error stopping bot ${botName}:`, error);
-        showToast(`Failed to start bot: ${error.message}`, 'error');
-        
-        // Reset button state on error
-        if (stopBtn) {
-            stopBtn.innerHTML = originalHtml;
-            stopBtn.disabled = false;
-        }
+        showToast(`Failed to stop bot: ${error.message}`, 'error');
     }
 }
 
@@ -1731,6 +1696,9 @@ function createExpandedRow(chat) {
     const botsHtml = chat.bots.map(bot => {
         const isRunning = bot.status === 'running';
         const uptimeText = bot.uptime_seconds ? formatUptime(bot.uptime_seconds) : 'N/A';
+        const logsKey = `${bot.name}::${chat.chat_jid}`;
+        const logsVisible = state.expandedLogs.has(logsKey);
+        const safeLogsId = `${bot.name}-${safeJid}`;
         
         return `
             <div class="bot-detail-item">
@@ -1758,6 +1726,11 @@ function createExpandedRow(chat) {
                             ${!isRunning ? 'disabled' : ''}>
                         📋
                     </button>
+                </div>
+                <div class="logs-section ${logsVisible ? 'visible' : ''}" id="logs-${safeLogsId}">
+                    <div class="logs-container" id="logs-container-${safeLogsId}">
+                        <p style="color: var(--text-muted);">Loading logs...</p>
+                    </div>
                 </div>
             </div>
         `;
