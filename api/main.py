@@ -7,7 +7,7 @@ import sys
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import yaml
 from dotenv import load_dotenv
@@ -366,27 +366,104 @@ async def list_bots():
 
 # ===== Chat Management Endpoints =====
 
-@app.get("/chats", response_model=List[ChatWithBots])
-async def list_chats():
-    """List all chats with their bot status."""
+@app.get("/chats")
+async def list_chats(
+    page: int = 1,
+    per_page: int = 20,
+    sort: str = "last_message_time",
+    order: str = "desc",
+    activity: Optional[str] = None,
+    bot_status: Optional[str] = None,
+    chat_type: Optional[str] = None,
+    search: Optional[str] = None
+):
+    """
+    List all chats with their bot status, pagination, and filtering.
+    
+    Query parameters:
+    - page: Page number (default: 1)
+    - per_page: Items per page (default: 20, max: 100)
+    - sort: Sort field (last_message_time, chat_name, message_count, added_at)
+    - order: Sort order (asc, desc)
+    - activity: Filter by activity (active, recent, idle)
+    - bot_status: Filter by bot status (running, enabled, none) - not yet implemented
+    - chat_type: Filter by type (group, individual)
+    - search: Search term for chat name or JID
+    """
     try:
-        chats = database.list_chats()
-        result = []
+        # Validate and limit per_page
+        per_page = min(per_page, 100)
+        offset = (page - 1) * per_page
         
+        # Get chats with filters
+        chats = database.list_chats(
+            limit=per_page,
+            offset=offset,
+            sort_by=sort,
+            order=order,
+            activity_filter=activity,
+            bot_status_filter=bot_status,
+            chat_type_filter=chat_type,
+            search=search
+        )
+        
+        # Get total count for pagination
+        total_count = database.count_chats(
+            activity_filter=activity,
+            bot_status_filter=bot_status,
+            chat_type_filter=chat_type,
+            search=search
+        )
+        
+        result = []
         for chat in chats:
             chat_jid = chat['chat_jid']
             bot_statuses = bot_manager.get_bot_statuses_for_chat(chat_jid)
             
-            result.append(ChatWithBots(
-                chat_jid=chat['chat_jid'],
-                chat_name=chat['chat_name'],
-                is_manual=bool(chat['is_manual']),
-                last_synced=chat.get('last_synced'),
-                added_at=chat['added_at'],
-                bots=bot_statuses
-            ))
+            # Convert bot statuses to dicts (handle both BotStatus objects and dicts)
+            bots_list = []
+            for bot in bot_statuses:
+                if hasattr(bot, 'model_dump'):
+                    # Pydantic v2
+                    bots_list.append(bot.model_dump())
+                elif hasattr(bot, 'dict'):
+                    # Pydantic v1
+                    bots_list.append(bot.dict())
+                elif isinstance(bot, dict):
+                    # Already a dict
+                    bots_list.append(bot)
+                else:
+                    # BotStatus object, convert manually
+                    bots_list.append({
+                        "name": bot.name,
+                        "chat_jid": bot.chat_jid,
+                        "display_name": bot.display_name,
+                        "status": bot.status,
+                        "prefix": bot.prefix,
+                        "uptime_seconds": bot.uptime_seconds,
+                        "enabled": bot.enabled
+                    })
+            
+            result.append({
+                "chat_jid": chat['chat_jid'],
+                "chat_name": chat['chat_name'],
+                "is_manual": bool(chat['is_manual']),
+                "last_synced": chat.get('last_synced'),
+                "last_message_time": chat.get('last_message_time'),
+                "message_count": chat.get('message_count', 0),
+                "added_at": chat['added_at'],
+                "bots": bots_list
+            })
         
-        return result
+        return {
+            "chats": result,
+            "pagination": {
+                "page": page,
+                "per_page": per_page,
+                "total": total_count,
+                "total_pages": (total_count + per_page - 1) // per_page
+            }
+        }
     except Exception as e:
         logger.error(f"Error listing chats: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
@@ -604,6 +681,92 @@ async def delete_chat(chat_jid: str):
         raise
     except Exception as e:
         logger.error(f"Error deleting chat: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/chats/bulk-action")
+async def bulk_action_chats(
+    chat_jids: List[str],
+    action: str,
+    bot_name: Optional[str] = None,
+    enabled: Optional[bool] = None
+):
+    """
+    Perform bulk operations on multiple chats.
+    
+    Supported actions:
+    - start_bots: Start all enabled bots for selected chats
+    - stop_bots: Stop all running bots for selected chats
+    - enable_bot: Enable a specific bot for selected chats (requires bot_name)
+    - disable_bot: Disable a specific bot for selected chats (requires bot_name)
+    - delete_chats: Delete selected chats
+    """
+    try:
+        results = {
+            "success": [],
+            "failed": [],
+            "total": len(chat_jids)
+        }
+        
+        for chat_jid in chat_jids:
+            try:
+                if action == "start_bots":
+                    # Start all enabled bots for this chat
+                    enabled_bots = database.get_enabled_bots_for_chat(chat_jid)
+                    for bot in enabled_bots:
+                        bot_manager.start_bot(bot, chat_jid)
+                    results["success"].append({"chat_jid": chat_jid, "message": f"Started {len(enabled_bots)} bot(s)"})
+                
+                elif action == "stop_bots":
+                    # Stop all running bots for this chat
+                    stopped_count = 0
+                    for bot in bot_manager.get_available_bots():
+                        bot_key = (bot, chat_jid)
+                        if bot_key in bot_manager.bots:
+                            bot_manager.stop_bot(bot, chat_jid)
+                            stopped_count += 1
+                    results["success"].append({"chat_jid": chat_jid, "message": f"Stopped {stopped_count} bot(s)"})
+                
+                elif action == "enable_bot":
+                    if not bot_name:
+                        raise ValueError("bot_name is required for enable_bot action")
+                    database.set_bot_assignment(bot_name, chat_jid, enabled=True)
+                    results["success"].append({"chat_jid": chat_jid, "message": f"Enabled bot {bot_name}"})
+                
+                elif action == "disable_bot":
+                    if not bot_name:
+                        raise ValueError("bot_name is required for disable_bot action")
+                    database.set_bot_assignment(bot_name, chat_jid, enabled=False)
+                    # Also stop the bot if it's running
+                    bot_key = (bot_name, chat_jid)
+                    if bot_key in bot_manager.bots:
+                        bot_manager.stop_bot(bot_name, chat_jid)
+                    results["success"].append({"chat_jid": chat_jid, "message": f"Disabled bot {bot_name}"})
+                
+                elif action == "delete_chats":
+                    # Stop all bots first
+                    for bot in bot_manager.get_available_bots():
+                        bot_key = (bot, chat_jid)
+                        if bot_key in bot_manager.bots:
+                            bot_manager.stop_bot(bot, chat_jid)
+                    # Delete chat
+                    database.delete_chat(chat_jid)
+                    results["success"].append({"chat_jid": chat_jid, "message": "Chat deleted"})
+                
+                else:
+                    results["failed"].append({"chat_jid": chat_jid, "error": f"Unknown action: {action}"})
+            
+            except Exception as e:
+                logger.error(f"Error in bulk action for chat {chat_jid}: {e}", exc_info=True)
+                results["failed"].append({"chat_jid": chat_jid, "error": str(e)})
+        
+        return {
+            "message": f"Bulk action '{action}' completed",
+            "results": results
+        }
+    
+    except Exception as e:
+        logger.error(f"Error in bulk action: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

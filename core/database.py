@@ -43,8 +43,27 @@ class MessageDatabase:
                 chat_name TEXT,
                 is_manual INTEGER DEFAULT 0,
                 last_synced TIMESTAMP,
+                last_message_time TIMESTAMP,
+                message_count INTEGER DEFAULT 0,
                 added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
+        """)
+        
+        # Add columns if they don't exist (for existing databases)
+        try:
+            cursor.execute("ALTER TABLE chats ADD COLUMN last_message_time TIMESTAMP")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+        
+        try:
+            cursor.execute("ALTER TABLE chats ADD COLUMN message_count INTEGER DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+        
+        # Create index for faster sorting
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_chats_last_message_time 
+            ON chats(last_message_time DESC)
         """)
         
         # New table for bot-chat assignments
@@ -135,12 +154,81 @@ class MessageDatabase:
             return dict(row)
         return None
     
-    def list_chats(self) -> List[Dict[str, Any]]:
-        """List all chats in the database."""
+    def list_chats(
+        self,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+        sort_by: str = "last_message_time",
+        order: str = "desc",
+        activity_filter: Optional[str] = None,
+        bot_status_filter: Optional[str] = None,
+        chat_type_filter: Optional[str] = None,
+        search: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        List all chats in the database with pagination, sorting, and filtering.
+        
+        Args:
+            limit: Maximum number of chats to return
+            offset: Number of chats to skip
+            sort_by: Field to sort by (last_message_time, chat_name, message_count, added_at)
+            order: Sort order (asc or desc)
+            activity_filter: Filter by activity status (active, recent, idle)
+            bot_status_filter: Filter by bot status (running, enabled, none)
+            chat_type_filter: Filter by chat type (group, individual)
+            search: Search term for chat name or JID
+        """
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM chats ORDER BY added_at DESC")
+        
+        # Build query with filters
+        query = "SELECT * FROM chats WHERE 1=1"
+        params = []
+        
+        # Activity filter
+        if activity_filter == "active":
+            query += " AND last_message_time >= datetime('now', '-1 day')"
+        elif activity_filter == "recent":
+            query += " AND last_message_time >= datetime('now', '-7 days')"
+        elif activity_filter == "idle":
+            query += " AND (last_message_time IS NULL OR last_message_time < datetime('now', '-7 days'))"
+        
+        # Chat type filter
+        if chat_type_filter == "group":
+            query += " AND chat_jid LIKE '%@g.us'"
+        elif chat_type_filter == "individual":
+            query += " AND chat_jid NOT LIKE '%@g.us'"
+        
+        # Search filter
+        if search:
+            query += " AND (chat_name LIKE ? OR chat_jid LIKE ?)"
+            search_term = f"%{search}%"
+            params.extend([search_term, search_term])
+        
+        # Sort order
+        valid_sort_fields = ["last_message_time", "chat_name", "message_count", "added_at"]
+        if sort_by not in valid_sort_fields:
+            sort_by = "last_message_time"
+        
+        # Handle NULL values in last_message_time (put them at the end)
+        if sort_by == "last_message_time":
+            if order.lower() == "desc":
+                query += f" ORDER BY {sort_by} DESC NULLS LAST"
+            else:
+                query += f" ORDER BY {sort_by} ASC NULLS LAST"
+        else:
+            query += f" ORDER BY {sort_by} {order.upper()}"
+        
+        # Pagination
+        if limit is not None:
+            query += " LIMIT ?"
+            params.append(limit)
+            if offset is not None:
+                query += " OFFSET ?"
+                params.append(offset)
+        
+        cursor.execute(query, params)
         rows = cursor.fetchall()
         conn.close()
         return [dict(row) for row in rows]
@@ -149,7 +237,9 @@ class MessageDatabase:
         self,
         chat_jid: str,
         chat_name: Optional[str] = None,
-        last_synced: Optional[str] = None
+        last_synced: Optional[str] = None,
+        last_message_time: Optional[str] = None,
+        increment_message_count: bool = False
     ) -> bool:
         """Update chat information."""
         try:
@@ -167,6 +257,13 @@ class MessageDatabase:
                 updates.append("last_synced = ?")
                 params.append(last_synced)
             
+            if last_message_time is not None:
+                updates.append("last_message_time = ?")
+                params.append(last_message_time)
+            
+            if increment_message_count:
+                updates.append("message_count = message_count + 1")
+            
             if not updates:
                 return True
             
@@ -180,6 +277,61 @@ class MessageDatabase:
         except Exception as e:
             logger.error(f"Error updating chat: {e}", exc_info=True)
             return False
+    
+    def count_chats(
+        self,
+        activity_filter: Optional[str] = None,
+        bot_status_filter: Optional[str] = None,
+        chat_type_filter: Optional[str] = None,
+        search: Optional[str] = None
+    ) -> int:
+        """
+        Count chats with the same filters as list_chats.
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        query = "SELECT COUNT(*) FROM chats WHERE 1=1"
+        params = []
+        
+        # Activity filter
+        if activity_filter == "active":
+            query += " AND last_message_time >= datetime('now', '-1 day')"
+        elif activity_filter == "recent":
+            query += " AND last_message_time >= datetime('now', '-7 days')"
+        elif activity_filter == "idle":
+            query += " AND (last_message_time IS NULL OR last_message_time < datetime('now', '-7 days'))"
+        
+        # Chat type filter
+        if chat_type_filter == "group":
+            query += " AND chat_jid LIKE '%@g.us'"
+        elif chat_type_filter == "individual":
+            query += " AND chat_jid NOT LIKE '%@g.us'"
+        
+        # Search filter
+        if search:
+            query += " AND (chat_name LIKE ? OR chat_jid LIKE ?)"
+            search_term = f"%{search}%"
+            params.extend([search_term, search_term])
+        
+        cursor.execute(query, params)
+        count = cursor.fetchone()[0]
+        conn.close()
+        return count
+    
+    def update_message_activity(self, chat_jid: str, message_time: Optional[str] = None) -> bool:
+        """
+        Update the last_message_time for a chat and increment message count.
+        Called when a message is processed for this chat.
+        """
+        if message_time is None:
+            message_time = datetime.utcnow().isoformat()
+        
+        return self.update_chat(
+            chat_jid=chat_jid,
+            last_message_time=message_time,
+            increment_message_count=True
+        )
     
     def delete_chat(self, chat_jid: str) -> bool:
         """Delete a chat and its assignments."""

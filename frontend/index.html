@@ -180,11 +180,84 @@
             <div class="section-header-bar">
                 <h2 class="section-title-large">Your Chats</h2>
                 <div class="header-actions">
+                    <!-- View Toggle -->
+                    <div class="view-toggle">
+                        <button class="view-toggle-btn" data-view="table" id="tableViewBtn" title="Table View">
+                            <span class="icon">📊</span>
+                        </button>
+                        <button class="view-toggle-btn active" data-view="cards" id="cardsViewBtn" title="Cards View">
+                            <span class="icon">🎴</span>
+                        </button>
+                    </div>
+                    
                     <div class="search-box">
                         <span class="search-icon">🔍</span>
                         <input type="text" placeholder="Search chats..." id="searchChats" class="search-input">
                     </div>
                 </div>
+            </div>
+            
+            <!-- Filter Bar -->
+            <div class="filter-bar glass-card" id="filterBar">
+                <div class="filter-group">
+                    <label class="filter-label">Activity:</label>
+                    <select class="filter-select" id="activityFilter">
+                        <option value="">All</option>
+                        <option value="active">Active (Today)</option>
+                        <option value="recent">Recent (This Week)</option>
+                        <option value="idle">Idle (>1 Week)</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label class="filter-label">Type:</label>
+                    <select class="filter-select" id="chatTypeFilter">
+                        <option value="">All</option>
+                        <option value="group">Groups</option>
+                        <option value="individual">Individual</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label class="filter-label">Bots:</label>
+                    <select class="filter-select" id="botStatusFilter">
+                        <option value="">All</option>
+                        <option value="running">Has Running</option>
+                        <option value="enabled">Has Enabled</option>
+                        <option value="none">No Bots</option>
+                    </select>
+                </div>
+                
+                <button class="filter-clear-btn" id="clearFiltersBtn">
+                    <span class="icon">✕</span> Clear
+                </button>
+                
+                <div class="filter-info" id="filterInfo">
+                    Showing <strong id="showingCount">0</strong> of <strong id="totalCount">0</strong> chats
+                </div>
+            </div>
+            
+            <!-- Bulk Actions Toolbar (hidden by default) -->
+            <div class="bulk-actions-bar glass-card" id="bulkActionsBar" style="display: none;">
+                <div class="bulk-actions-info">
+                    <span id="selectedCount">0</span> selected
+                </div>
+                
+                <div class="bulk-actions-buttons">
+                    <button class="bulk-action-btn" id="bulkStartBots">
+                        <span class="icon">▶️</span> Start Bots
+                    </button>
+                    <button class="bulk-action-btn" id="bulkStopBots">
+                        <span class="icon">⏹️</span> Stop Bots
+                    </button>
+                    <button class="bulk-action-btn danger" id="bulkDeleteChats">
+                        <span class="icon">🗑️</span> Delete
+                    </button>
+                </div>
+                
+                <button class="bulk-cancel-btn" id="bulkCancelBtn">
+                    Cancel
+                </button>
             </div>
 
             <!-- Loading State -->
@@ -215,7 +288,80 @@
                 </div>
             </div>
 
-            <!-- Chats Container -->
+            <!-- Table View Container -->
+            <div id="table-view-container" class="table-view-container" style="display: none;">
+                <div class="table-wrapper glass-card">
+                    <table class="chats-table" id="chatsTable">
+                        <thead>
+                            <tr>
+                                <th class="col-select">
+                                    <input type="checkbox" id="selectAllChats" class="chat-checkbox">
+                                </th>
+                                <th class="col-name sortable" data-sort="chat_name">
+                                    Chat Name <span class="sort-icon">↕️</span>
+                                </th>
+                                <th class="col-activity sortable active-sort" data-sort="last_message_time">
+                                    Last Activity <span class="sort-icon">↓</span>
+                                </th>
+                                <th class="col-messages sortable" data-sort="message_count">
+                                    Messages <span class="sort-icon">↕️</span>
+                                </th>
+                                <th class="col-bots">
+                                    Bots
+                                </th>
+                                <th class="col-status">
+                                    Status
+                                </th>
+                                <th class="col-actions">
+                                    Actions
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody id="chatsTableBody">
+                            <!-- Table rows will be inserted here dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Pagination Controls -->
+                <div class="pagination-controls glass-card" id="paginationControls">
+                    <div class="pagination-info">
+                        <span id="paginationInfo">Page 1 of 1</span>
+                    </div>
+                    
+                    <div class="pagination-buttons">
+                        <button class="pagination-btn" id="firstPageBtn" disabled>
+                            <span>««</span>
+                        </button>
+                        <button class="pagination-btn" id="prevPageBtn" disabled>
+                            <span>‹</span>
+                        </button>
+                        
+                        <div class="page-numbers" id="pageNumbers">
+                            <!-- Page numbers will be inserted here -->
+                        </div>
+                        
+                        <button class="pagination-btn" id="nextPageBtn">
+                            <span>›</span>
+                        </button>
+                        <button class="pagination-btn" id="lastPageBtn">
+                            <span>»»</span>
+                        </button>
+                    </div>
+                    
+                    <div class="pagination-size">
+                        <label>Per page:</label>
+                        <select class="per-page-select" id="perPageSelect">
+                            <option value="10">10</option>
+                            <option value="20" selected>20</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chats Container (Card View) -->
             <div id="chats-container" class="chats-grid">
                 <!-- Chat cards will be inserted here dynamically -->
             </div>

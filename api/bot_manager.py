@@ -153,8 +153,8 @@ class BotManager:
         
         bot_key = (bot_name, chat_jid)
         if bot_key in self.bots:
-            logger.warning(f"Bot already running: {bot_name} for chat {chat_jid}")
-            return False
+            logger.info(f"Bot already running: {bot_name} for chat {chat_jid}")
+            return True  # Already running = success
         
         try:
             # Create bot instance
@@ -201,8 +201,8 @@ class BotManager:
         """Stop a bot for a specific chat."""
         bot_key = (bot_name, chat_jid)
         if bot_key not in self.bots:
-            logger.warning(f"Bot not running: {bot_name} for chat {chat_jid}")
-            return False
+            logger.info(f"Bot already stopped: {bot_name} for chat {chat_jid}")
+            return True  # Already stopped = success
         
         try:
             # Signal bot to stop

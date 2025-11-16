@@ -9,12 +9,36 @@ const REFRESH_INTERVAL = 10000; // 10 seconds
 // State management
 const state = {
     chats: [],
+    allChatsData: null, // Store the full API response with pagination info
     expandedChats: new Set(),
     expandedLogs: new Set(),
     expandedMessages: new Set(),
+    expandedTableRows: new Set(),
     refreshTimer: null,
     currentView: 'dashboard',
-    searchQuery: ''
+    viewMode: 'cards', // 'cards' or 'table'
+    searchQuery: '',
+    
+    // Table/Pagination state
+    currentPage: 1,
+    perPage: 20,
+    sortBy: 'last_message_time',
+    sortOrder: 'desc',
+    
+    // Filters
+    filters: {
+        activity: '',
+        chatType: '',
+        botStatus: '',
+        search: ''
+    },
+    
+    // Bulk selection
+    selectedChats: new Set(),
+    
+    // Debounce timers
+    searchDebounceTimer: null,
+    filterDebounceTimer: null
 };
 
 // ===================================
@@ -79,15 +103,77 @@ function setupEventListeners() {
     document.getElementById('closeAddChat')?.addEventListener('click', toggleAddChatForm);
     document.getElementById('submitAddChat')?.addEventListener('click', addChatManually);
 
-    // Search
+    // View toggle (table/cards)
+    document.getElementById('tableViewBtn')?.addEventListener('click', () => switchViewMode('table'));
+    document.getElementById('cardsViewBtn')?.addEventListener('click', () => switchViewMode('cards'));
+
+    // Search with debouncing
     document.getElementById('searchChats')?.addEventListener('input', (e) => {
-        state.searchQuery = e.target.value.toLowerCase();
-        if (state.currentView === 'bots') {
-            displayBotsView();
-        } else {
-            filterChats();
+        const query = e.target.value.trim();
+        
+        clearTimeout(state.searchDebounceTimer);
+        state.searchDebounceTimer = setTimeout(() => {
+            state.filters.search = query;
+            state.searchQuery = query.toLowerCase();
+            state.currentPage = 1; // Reset to first page on search
+            
+            if (state.viewMode === 'table') {
+                loadChats();
+            } else if (state.currentView === 'bots') {
+                displayBotsView();
+            } else {
+                filterChats();
+            }
+        }, 300);
+    });
+
+    // Filters
+    document.getElementById('activityFilter')?.addEventListener('change', (e) => {
+        state.filters.activity = e.target.value;
+        state.currentPage = 1;
+        loadChats();
+    });
+
+    document.getElementById('chatTypeFilter')?.addEventListener('change', (e) => {
+        state.filters.chatType = e.target.value;
+        state.currentPage = 1;
+        loadChats();
+    });
+
+    document.getElementById('botStatusFilter')?.addEventListener('change', (e) => {
+        state.filters.botStatus = e.target.value;
+        state.currentPage = 1;
+        loadChats();
+    });
+
+    document.getElementById('clearFiltersBtn')?.addEventListener('click', clearFilters);
+
+    // Pagination
+    document.getElementById('firstPageBtn')?.addEventListener('click', () => goToPage(1));
+    document.getElementById('prevPageBtn')?.addEventListener('click', () => goToPage(state.currentPage - 1));
+    document.getElementById('nextPageBtn')?.addEventListener('click', () => goToPage(state.currentPage + 1));
+    document.getElementById('lastPageBtn')?.addEventListener('click', () => {
+        if (state.allChatsData) {
+            goToPage(state.allChatsData.pagination.total_pages);
         }
     });
+
+    document.getElementById('perPageSelect')?.addEventListener('change', (e) => {
+        state.perPage = parseInt(e.target.value);
+        state.currentPage = 1;
+        loadChats();
+    });
+
+    // Select all checkbox
+    document.getElementById('selectAllChats')?.addEventListener('change', (e) => {
+        toggleSelectAll(e.target.checked);
+    });
+
+    // Bulk actions
+    document.getElementById('bulkStartBots')?.addEventListener('click', () => bulkAction('start_bots'));
+    document.getElementById('bulkStopBots')?.addEventListener('click', () => bulkAction('stop_bots'));
+    document.getElementById('bulkDeleteChats')?.addEventListener('click', () => bulkAction('delete_chats'));
+    document.getElementById('bulkCancelBtn')?.addEventListener('click', cancelBulkSelection);
 
     // Enter key on chat inputs
     document.getElementById('manualChatJid')?.addEventListener('keypress', (e) => {
@@ -235,22 +321,53 @@ async function loadChats() {
         showLoading();
         hideError();
         
-        const response = await fetch(`${API_BASE_URL}/chats`);
+        // Build query parameters
+        const params = new URLSearchParams();
+        
+        if (state.viewMode === 'table') {
+            params.append('page', state.currentPage);
+            params.append('per_page', state.perPage);
+            params.append('sort', state.sortBy);
+            params.append('order', state.sortOrder);
+            
+            if (state.filters.activity) params.append('activity', state.filters.activity);
+            if (state.filters.chatType) params.append('chat_type', state.filters.chatType);
+            if (state.filters.botStatus) params.append('bot_status', state.filters.botStatus);
+            if (state.filters.search) params.append('search', state.filters.search);
+        }
+        
+        const response = await fetch(`${API_BASE_URL}/chats?${params}`);
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         
-        state.chats = await response.json();
+        const data = await response.json();
+        
+        // Handle both old format (array) and new format (object with pagination)
+        if (Array.isArray(data)) {
+            // Old format for backward compatibility
+            state.chats = data;
+            state.allChatsData = null;
+        } else {
+            // New paginated format
+            state.chats = data.chats || [];
+            state.allChatsData = data;
+        }
+        
         console.log('✓ Loaded chats:', state.chats.length);
         
-        if (state.chats.length === 0) {
+        if (state.chats.length === 0 && !state.filters.search && !state.filters.activity) {
             showNoChats();
         } else {
-            // Chats start closed by default
-            displayChats(state.chats);
+            if (state.viewMode === 'table') {
+                displayTableView();
+            } else {
+                displayChats(state.chats);
+            }
         }
         
         updateDashboardStats();
+        updateFilterInfo();
         hideLoading();
         
     } catch (error) {
@@ -385,17 +502,6 @@ function createChatCard(chat) {
     
     return `
         <div class="chat-card ${expandedClass}" data-chat-jid="${chat.chat_jid}">
-            <!-- Messages Section -->
-            <div class="messages-section ${messagesVisible ? 'visible' : ''}" id="messages-${safeJid}">
-                <div class="messages-header">
-                    <span class="messages-title">💬 Recent Messages</span>
-                    <button class="messages-close-btn" onclick="toggleMessages('${escapeAttr(chat.chat_jid)}')">×</button>
-                </div>
-                <div class="messages-container" id="messages-container-${safeJid}">
-                    <p style="color: var(--text-muted);">Loading messages...</p>
-                </div>
-            </div>
-
             <!-- Chat Header -->
             <div class="chat-card-header" onclick="toggleChat('${escapeAttr(chat.chat_jid)}')">
                 <div class="chat-header-top">
@@ -442,6 +548,17 @@ function createChatCard(chat) {
             <div class="bots-section">
             <div class="bots-grid">
                     ${botsHtml}
+                </div>
+            </div>
+
+            <!-- Messages Section -->
+            <div class="messages-section ${messagesVisible ? 'visible' : ''}" id="messages-${safeJid}">
+                <div class="messages-header">
+                    <span class="messages-title">💬 Recent Messages</span>
+                    <button class="messages-close-btn" onclick="toggleMessages('${escapeAttr(chat.chat_jid)}')">×</button>
+                </div>
+                <div class="messages-container" id="messages-container-${safeJid}">
+                    <p style="color: var(--text-muted);">Loading messages...</p>
                 </div>
             </div>
         </div>
@@ -1194,6 +1311,454 @@ window.addEventListener('unhandledrejection', (event) => {
     }
     console.error('Unhandled promise rejection:', event.reason);
 });
+
+// ===================================
+// VIEW MODE SWITCHING
+// ===================================
+
+function switchViewMode(mode) {
+    state.viewMode = mode;
+    
+    // Update button states
+    document.getElementById('tableViewBtn')?.classList.toggle('active', mode === 'table');
+    document.getElementById('cardsViewBtn')?.classList.toggle('active', mode === 'cards');
+    
+    // Show/hide appropriate containers
+    const tableContainer = document.getElementById('table-view-container');
+    const cardsContainer = document.getElementById('chats-container');
+    
+    if (mode === 'table') {
+        tableContainer.style.display = 'block';
+        cardsContainer.style.display = 'none';
+        loadChats();
+    } else {
+        tableContainer.style.display = 'none';
+        cardsContainer.style.display = 'grid';
+        displayChats(state.chats);
+    }
+    
+    // Save preference
+    localStorage.setItem('viewMode', mode);
+}
+
+// ===================================
+// TABLE VIEW RENDERING
+// ===================================
+
+function displayTableView() {
+    const tbody = document.getElementById('chatsTableBody');
+    if (!tbody) return;
+    
+    if (state.chats.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" style="text-align: center; padding: 3rem; color: var(--text-secondary);">
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">💬</div>
+                    <div style="font-size: 1.125rem; font-weight: 600;">No chats found</div>
+                    <div style="font-size: 0.875rem; margin-top: 0.5rem;">Try adjusting your filters</div>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    tbody.innerHTML = state.chats.map(chat => createTableRow(chat)).join('');
+    renderPagination();
+    updateBulkSelectionUI();
+}
+
+function createTableRow(chat) {
+    const isSelected = state.selectedChats.has(chat.chat_jid);
+    const isExpanded = state.expandedTableRows.has(chat.chat_jid);
+    const runningBots = chat.bots.filter(b => b.status === 'running');
+    const enabledBots = chat.bots.filter(b => b.enabled);
+    
+    // Activity status
+    let activityBadge = '';
+    let activityClass = 'idle';
+    let activityText = 'Never';
+    
+    if (chat.last_message_time) {
+        const lastMsg = new Date(chat.last_message_time);
+        const now = new Date();
+        const diffHours = (now - lastMsg) / (1000 * 60 * 60);
+        
+        if (diffHours < 24) {
+            activityClass = 'active';
+            activityText = formatRelativeTime(lastMsg);
+        } else if (diffHours < 168) { // 7 days
+            activityClass = 'recent';
+            activityText = formatRelativeTime(lastMsg);
+        } else {
+            activityText = formatRelativeTime(lastMsg);
+        }
+        
+        activityBadge = `<span class="activity-badge ${activityClass}">${activityClass.toUpperCase()}</span>`;
+    }
+    
+    // Bot pills
+    const botPills = chat.bots.slice(0, 3).map(bot => {
+        const statusClass = bot.status === 'running' ? 'running' : (bot.enabled ? 'enabled' : '');
+        const icon = bot.status === 'running' ? '▶️' : (bot.enabled ? '✓' : '○');
+        return `<span class="bot-pill ${statusClass}"><span class="bot-pill-icon">${icon}</span>${escapeHtml(bot.display_name)}</span>`;
+    }).join('');
+    
+    const moreBots = chat.bots.length > 3 ? `<span class="bot-pill">+${chat.bots.length - 3}</span>` : '';
+    
+    // Status badge
+    let statusBadge = '';
+    if (runningBots.length > 0) {
+        statusBadge = `<span class="status-badge has-running">✓ ${runningBots.length} Running</span>`;
+    } else if (enabledBots.length > 0) {
+        statusBadge = `<span class="status-badge has-enabled">○ ${enabledBots.length} Enabled</span>`;
+    } else {
+        statusBadge = `<span class="status-badge no-bots">No Bots</span>`;
+    }
+    
+    // Main row
+    let html = `
+        <tr class="${isSelected ? 'selected' : ''} ${isExpanded ? 'expanded' : ''}" data-chat-jid="${chat.chat_jid}">
+            <td class="col-select">
+                <input type="checkbox" class="chat-checkbox" 
+                       ${isSelected ? 'checked' : ''} 
+                       onchange="toggleChatSelection('${escapeAttr(chat.chat_jid)}', this.checked)">
+            </td>
+            <td class="col-name">
+                <div class="chat-name-cell">
+                    <div class="chat-name-primary">${escapeHtml(chat.chat_name)}</div>
+                    <div class="chat-jid-secondary">${chat.chat_jid}</div>
+                </div>
+            </td>
+            <td class="col-activity">
+                <div class="activity-cell">
+                    <div class="activity-time">${activityText}</div>
+                    ${activityBadge}
+                </div>
+            </td>
+            <td class="col-messages">
+                <span class="message-count">${chat.message_count || 0}</span>
+            </td>
+            <td class="col-bots">
+                <div class="bots-cell">
+                    ${botPills}${moreBots}
+                </div>
+            </td>
+            <td class="col-status">
+                ${statusBadge}
+            </td>
+            <td class="col-actions">
+                <div class="actions-cell">
+                    <button class="table-action-btn expand" title="Expand" onclick="toggleTableRow('${escapeAttr(chat.chat_jid)}')">
+                        ${isExpanded ? '▲' : '▼'}
+                    </button>
+                    <button class="table-action-btn" title="View Messages" onclick="toggleMessages('${escapeAttr(chat.chat_jid)}')">
+                        💬
+                    </button>
+                    <button class="table-action-btn danger" title="Delete" onclick="deleteChat('${escapeAttr(chat.chat_jid)}')">
+                        🗑️
+                    </button>
+                </div>
+            </td>
+        </tr>
+    `;
+    
+    // Expanded details row
+    if (isExpanded) {
+        html += createExpandedRow(chat);
+    }
+    
+    return html;
+}
+
+function createExpandedRow(chat) {
+    const botsHtml = chat.bots.map(bot => {
+        const isRunning = bot.status === 'running';
+        const uptimeText = bot.uptime_seconds ? formatUptime(bot.uptime_seconds) : 'N/A';
+        
+        return `
+            <div class="bot-detail-item">
+                <div class="bot-detail-info">
+                    <div class="bot-detail-name">${escapeHtml(bot.display_name)}</div>
+                    <div class="bot-detail-meta">
+                        Prefix: ${escapeHtml(bot.prefix)} | 
+                        Uptime: ${uptimeText} | 
+                        ${bot.enabled ? 'Enabled' : 'Disabled'}
+                    </div>
+                </div>
+                <div class="bot-detail-actions">
+                    <button class="bot-btn start" 
+                            onclick="startBot('${bot.name}', '${escapeAttr(chat.chat_jid)}')" 
+                            ${isRunning ? 'disabled' : ''}>
+                        ▶️
+                    </button>
+                    <button class="bot-btn stop" 
+                            onclick="stopBot('${bot.name}', '${escapeAttr(chat.chat_jid)}')" 
+                            ${!isRunning ? 'disabled' : ''}>
+                        ⏹️
+                    </button>
+                    <button class="bot-btn logs" 
+                            onclick="toggleLogs('${bot.name}', '${escapeAttr(chat.chat_jid)}')"
+                            ${!isRunning ? 'disabled' : ''}>
+                        📋
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    return `
+        <tr class="row-details">
+            <td colspan="7">
+                <div class="row-details-content">
+                    <div class="details-section">
+                        <div class="details-section-title">
+                            <span>🤖</span> Bot Controls
+                        </div>
+                        <div class="bot-details-list">
+                            ${botsHtml || '<p style="color: var(--text-secondary);">No bots available</p>'}
+                        </div>
+                    </div>
+                    <div class="details-section">
+                        <div class="details-section-title">
+                            <span>💬</span> Recent Activity
+                        </div>
+                        <div style="color: var(--text-secondary); font-size: 0.875rem;">
+                            <p>Messages: ${chat.message_count || 0}</p>
+                            <p>Last activity: ${chat.last_message_time ? formatRelativeTime(new Date(chat.last_message_time)) : 'Never'}</p>
+                            <p>Added: ${formatRelativeTime(new Date(chat.added_at))}</p>
+                        </div>
+                    </div>
+                </div>
+            </td>
+        </tr>
+    `;
+}
+
+function toggleTableRow(chatJid) {
+    if (state.expandedTableRows.has(chatJid)) {
+        state.expandedTableRows.delete(chatJid);
+    } else {
+        state.expandedTableRows.add(chatJid);
+    }
+    displayTableView();
+}
+
+// ===================================
+// PAGINATION
+// ===================================
+
+function renderPagination() {
+    if (!state.allChatsData || !state.allChatsData.pagination) return;
+    
+    const { page, per_page, total, total_pages } = state.allChatsData.pagination;
+    
+    // Update info
+    document.getElementById('paginationInfo').textContent = `Page ${page} of ${total_pages}`;
+    
+    // Update buttons
+    document.getElementById('firstPageBtn').disabled = page === 1;
+    document.getElementById('prevPageBtn').disabled = page === 1;
+    document.getElementById('nextPageBtn').disabled = page === total_pages;
+    document.getElementById('lastPageBtn').disabled = page === total_pages;
+    
+    // Render page numbers (show 5 at a time)
+    const pageNumbers = document.getElementById('pageNumbers');
+    const pages = [];
+    
+    let startPage = Math.max(1, page - 2);
+    let endPage = Math.min(total_pages, page + 2);
+    
+    // Adjust if we're at the edges
+    if (page <= 3) {
+        endPage = Math.min(5, total_pages);
+    } else if (page >= total_pages - 2) {
+        startPage = Math.max(1, total_pages - 4);
+    }
+    
+    for (let i = startPage; i <= endPage; i++) {
+        pages.push(`
+            <button class="pagination-btn ${i === page ? 'active' : ''}" 
+                    onclick="goToPage(${i})">
+                ${i}
+            </button>
+        `);
+    }
+    
+    pageNumbers.innerHTML = pages.join('');
+}
+
+function goToPage(page) {
+    if (!state.allChatsData) return;
+    
+    const totalPages = state.allChatsData.pagination.total_pages;
+    if (page < 1 || page > totalPages) return;
+    
+    state.currentPage = page;
+    loadChats();
+}
+
+// ===================================
+// FILTERING & SORTING
+// ===================================
+
+function clearFilters() {
+    state.filters = {
+        activity: '',
+        chatType: '',
+        botStatus: '',
+        search: ''
+    };
+    state.currentPage = 1;
+    
+    document.getElementById('activityFilter').value = '';
+    document.getElementById('chatTypeFilter').value = '';
+    document.getElementById('botStatusFilter').value = '';
+    document.getElementById('searchChats').value = '';
+    
+    loadChats();
+}
+
+function updateFilterInfo() {
+    const showingCount = state.chats.length;
+    const totalCount = state.allChatsData ? state.allChatsData.pagination.total : showingCount;
+    
+    document.getElementById('showingCount').textContent = showingCount;
+    document.getElementById('totalCount').textContent = totalCount;
+}
+
+function handleSort(column) {
+    if (state.sortBy === column) {
+        // Toggle order
+        state.sortOrder = state.sortOrder === 'asc' ? 'desc' : 'asc';
+    } else {
+        state.sortBy = column;
+        state.sortOrder = 'desc';
+    }
+    
+    // Update UI
+    document.querySelectorAll('.chats-table th.sortable').forEach(th => {
+        th.classList.remove('active-sort');
+        const icon = th.querySelector('.sort-icon');
+        if (icon) icon.textContent = '↕️';
+    });
+    
+    const activeHeader = document.querySelector(`[data-sort="${column}"]`);
+    if (activeHeader) {
+        activeHeader.classList.add('active-sort');
+        const icon = activeHeader.querySelector('.sort-icon');
+        if (icon) icon.textContent = state.sortOrder === 'asc' ? '↑' : '↓';
+    }
+    
+    state.currentPage = 1;
+    loadChats();
+}
+
+// Add sorting event listeners
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.chats-table th.sortable').forEach(th => {
+        th.addEventListener('click', () => {
+            const sortColumn = th.dataset.sort;
+            if (sortColumn) handleSort(sortColumn);
+        });
+    });
+});
+
+// ===================================
+// BULK ACTIONS
+// ===================================
+
+function toggleChatSelection(chatJid, checked) {
+    if (checked) {
+        state.selectedChats.add(chatJid);
+    } else {
+        state.selectedChats.delete(chatJid);
+    }
+    updateBulkSelectionUI();
+}
+
+function toggleSelectAll(checked) {
+    if (checked) {
+        state.chats.forEach(chat => state.selectedChats.add(chat.chat_jid));
+    } else {
+        state.selectedChats.clear();
+    }
+    displayTableView();
+}
+
+function updateBulkSelectionUI() {
+    const count = state.selectedChats.size;
+    const bulkBar = document.getElementById('bulkActionsBar');
+    const selectAllCheckbox = document.getElementById('selectAllChats');
+    
+    if (count > 0) {
+        bulkBar.style.display = 'flex';
+        document.getElementById('selectedCount').textContent = count;
+    } else {
+        bulkBar.style.display = 'none';
+    }
+    
+    // Update select all checkbox
+    if (selectAllCheckbox) {
+        selectAllCheckbox.checked = state.chats.length > 0 && 
+                                     state.chats.every(c => state.selectedChats.has(c.chat_jid));
+    }
+}
+
+function cancelBulkSelection() {
+    state.selectedChats.clear();
+    displayTableView();
+}
+
+async function bulkAction(action) {
+    const chatJids = Array.from(state.selectedChats);
+    
+    if (chatJids.length === 0) {
+        showToast('No chats selected', 'warning');
+        return;
+    }
+    
+    // Confirmation for delete
+    if (action === 'delete_chats') {
+        if (!confirm(`Are you sure you want to delete ${chatJids.length} chat(s)?\n\nThis will stop all bots for these chats.`)) {
+            return;
+        }
+    }
+    
+    showToast(`Processing ${chatJids.length} chat(s)...`, 'info');
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/chats/bulk-action`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chat_jids: chatJids,
+                action: action
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error('Bulk action failed');
+        }
+        
+        const result = await response.json();
+        
+        const successCount = result.results.success.length;
+        const failedCount = result.results.failed.length;
+        
+        if (failedCount > 0) {
+            showToast(`Completed: ${successCount} succeeded, ${failedCount} failed`, 'warning');
+        } else {
+            showToast(`Successfully processed ${successCount} chat(s)`, 'success');
+        }
+        
+        state.selectedChats.clear();
+        await loadChats();
+        
+    } catch (error) {
+        console.error('Bulk action error:', error);
+        showToast(`Bulk action failed: ${error.message}`, 'error');
+    }
+}
 
 // ===================================
 // INITIALIZATION
