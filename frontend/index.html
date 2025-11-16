@@ -3,59 +3,243 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WhatsApp Bot Service - Multi-Chat Manager</title>
+    <meta name="theme-color" content="#6366f1">
+    <title>WhatsLang - Multi-Chat Bot Manager</title>
     <link rel="stylesheet" href="styles.css">
-    <meta name="description" content="Manage WhatsApp bots across multiple chats with an intuitive web interface">
+    <meta name="description" content="Modern dashboard for managing WhatsApp bots across multiple chats">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>🤖 WhatsApp Bot Service</h1>
-            <p class="subtitle">Manage bots across multiple chats</p>
-        </header>
+    <!-- Mobile Menu Overlay -->
+    <div class="mobile-overlay" id="mobileOverlay"></div>
 
-        <div class="toolbar">
-            <button id="syncChatsBtn" class="btn-primary" title="Sync chats from WhatsApp API">
-                🔄 Sync Chats from WhatsApp
-            </button>
-            <div class="add-chat-form">
-                <input 
-                    type="text" 
-                    id="manualChatJid" 
-                    placeholder="Chat JID (e.g., 123456789@g.us)" 
-                    autocomplete="off"
-                />
-                <input 
-                    type="text" 
-                    id="manualChatName" 
-                    placeholder="Chat Name (optional - will auto-fetch from WhatsApp)" 
-                    autocomplete="off"
-                />
-                <button id="addChatBtn" class="btn-secondary" title="Add chat manually - name will be fetched from WhatsApp if not provided">
-                    ➕ Add Chat Manually
-                </button>
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <div class="logo-icon">💬</div>
+                <span class="logo-text">WhatsLang</span>
             </div>
+            <button class="mobile-close" id="closeSidebar">×</button>
         </div>
 
-        <main>
-            <div id="chats-container" class="chats-list">
-                <!-- Chat sections will be inserted here dynamically -->
+        <nav class="sidebar-nav">
+            <a href="#" class="nav-item active" data-view="dashboard">
+                <span class="nav-icon">📊</span>
+                <span class="nav-label">Dashboard</span>
+            </a>
+            <a href="#" class="nav-item" data-view="chats">
+                <span class="nav-icon">💬</span>
+                <span class="nav-label">Chats</span>
+                <span class="nav-badge" id="chatsCount">0</span>
+            </a>
+            <a href="#" class="nav-item" data-view="bots">
+                <span class="nav-icon">🤖</span>
+                <span class="nav-label">Bots</span>
+                <span class="nav-badge" id="botsCount">0</span>
+            </a>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="stats-mini">
+                <div class="stat-mini">
+                    <div class="stat-mini-value" id="statsRunning">0</div>
+                    <div class="stat-mini-label">Running</div>
+                </div>
+                <div class="stat-mini">
+                    <div class="stat-mini-value" id="statsStopped">0</div>
+                    <div class="stat-mini-label">Stopped</div>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Top Bar -->
+        <header class="top-bar">
+            <button class="mobile-menu-btn" id="mobileMenuBtn">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+            
+            <div class="top-bar-title">
+                <h1 id="pageTitle">Dashboard</h1>
+                <p class="top-bar-subtitle" id="pageSubtitle">Overview of your bot operations</p>
             </div>
 
-            <div id="loading" class="loading">
-                <p>Loading chats and bot status...</p>
+            <div class="top-bar-actions">
+                <button class="icon-btn" id="refreshBtn" title="Refresh">
+                    <span class="icon">🔄</span>
+                </button>
+                <div class="status-indicator">
+                    <span class="status-dot pulse"></span>
+                    <span class="status-text">Live</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Dashboard Overview -->
+        <section class="dashboard-overview" id="dashboardOverview">
+            <div class="stats-grid">
+                <div class="stat-card glass-card">
+                    <div class="stat-icon purple">💬</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="totalChats">0</div>
+                        <div class="stat-label">Total Chats</div>
+                    </div>
+                    <div class="stat-trend up">
+                        <span class="trend-icon">↗</span>
+                    </div>
+                </div>
+
+                <div class="stat-card glass-card">
+                    <div class="stat-icon green">▶️</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="runningBots">0</div>
+                        <div class="stat-label">Bots Running</div>
+                    </div>
+                    <div class="stat-trend up">
+                        <span class="trend-icon">↗</span>
+                    </div>
+                </div>
+
+                <div class="stat-card glass-card">
+                    <div class="stat-icon blue">🤖</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="enabledBots">0</div>
+                        <div class="stat-label">Bots Enabled</div>
+                    </div>
+                    <div class="stat-trend">
+                        <span class="trend-icon">━</span>
+                    </div>
+                </div>
+
+                <div class="stat-card glass-card">
+                    <div class="stat-icon cyan">⚙️</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="availableBots">0</div>
+                        <div class="stat-label">Available Bots</div>
+                    </div>
+                    <div class="stat-trend">
+                        <span class="trend-icon">━</span>
+                    </div>
+                </div>
             </div>
 
-            <div id="error" class="error" style="display: none;">
-                <p></p>
+            <!-- Quick Actions -->
+            <div class="quick-actions glass-card">
+                <h3 class="section-title">Quick Actions</h3>
+                <div class="action-buttons">
+                    <button class="action-btn primary" id="syncChatsBtn">
+                        <span class="btn-icon">🔄</span>
+                        <span class="btn-text">Sync Chats</span>
+                    </button>
+                    <button class="action-btn secondary" id="addChatBtn">
+                        <span class="btn-icon">➕</span>
+                        <span class="btn-text">Add Chat</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Add Chat Form (Hidden by default) -->
+        <section class="add-chat-section glass-card" id="addChatSection" style="display: none;">
+            <div class="section-header">
+                <h3 class="section-title">Add New Chat</h3>
+                <button class="close-btn" id="closeAddChat">×</button>
+            </div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="manualChatJid">Chat JID</label>
+                    <input 
+                        type="text" 
+                        id="manualChatJid" 
+                        placeholder="e.g., 123456789@g.us"
+                        class="form-input"
+                    />
+                </div>
+                <div class="form-group">
+                    <label for="manualChatName">Chat Name (Optional)</label>
+                    <input 
+                        type="text" 
+                        id="manualChatName" 
+                        placeholder="Will auto-fetch from WhatsApp"
+                        class="form-input"
+                    />
+                </div>
+            </div>
+            <button class="action-btn primary" id="submitAddChat">
+                <span class="btn-icon">✓</span>
+                <span class="btn-text">Add Chat</span>
+            </button>
+        </section>
+
+        <!-- Chats Section -->
+        <section class="chats-section">
+            <div class="section-header-bar">
+                <h2 class="section-title-large">Your Chats</h2>
+                <div class="header-actions">
+                    <div class="search-box">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" placeholder="Search chats..." id="searchChats" class="search-input">
+                    </div>
+                </div>
             </div>
 
-            <div id="no-chats" class="no-chats" style="display: none;">
-                <p>No chats configured yet</p>
-                <p>Click "Sync Chats" to discover chats from WhatsApp or add a chat manually using the form above.</p>
+            <!-- Loading State -->
+            <div id="loading" class="loading-state">
+                <div class="skeleton-grid">
+                    <div class="skeleton-card"></div>
+                    <div class="skeleton-card"></div>
+                    <div class="skeleton-card"></div>
+                </div>
             </div>
-        </main>
-    </div>
+
+            <!-- Error State -->
+            <div id="error" class="error-state glass-card" style="display: none;">
+                <div class="error-icon">⚠️</div>
+                <p class="error-message"></p>
+            </div>
+
+            <!-- Empty State -->
+            <div id="no-chats" class="empty-state glass-card" style="display: none;">
+                <div class="empty-icon">💬</div>
+                <h3 class="empty-title">No Chats Yet</h3>
+                <p class="empty-text">Get started by syncing chats from WhatsApp or adding one manually.</p>
+                <div class="empty-actions">
+                    <button class="action-btn primary" onclick="document.getElementById('syncChatsBtn').click()">
+                        <span class="btn-icon">🔄</span>
+                        <span class="btn-text">Sync Chats</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Chats Container -->
+            <div id="chats-container" class="chats-grid">
+                <!-- Chat cards will be inserted here dynamically -->
+            </div>
+        </section>
+    </main>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Mobile Bottom Nav -->
+    <nav class="bottom-nav">
+        <button class="bottom-nav-item active" data-view="dashboard">
+            <span class="nav-icon">📊</span>
+            <span class="nav-label">Dashboard</span>
+        </button>
+        <button class="bottom-nav-item" data-view="chats">
+            <span class="nav-icon">💬</span>
+            <span class="nav-label">Chats</span>
+        </button>
+        <button class="bottom-nav-item" data-view="bots">
+            <span class="nav-icon">🤖</span>
+            <span class="nav-label">Bots</span>
+        </button>
+    </nav>
 
     <script src="app.js"></script>
 </body>
