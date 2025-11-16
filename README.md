@@ -190,7 +190,7 @@ docker exec whatslang-bot-service sqlite3 /data/messages.db .dump > backup.sql
 cat backup.sql | docker exec -i whatslang-bot-service sqlite3 /data/messages.db
 ```
 
-**📖 For detailed persistence documentation**, see [PERSISTENCE.md](PERSISTENCE.md)
+**📖 For detailed persistence documentation**, see [PERSISTENCE.md](docs/PERSISTENCE.md)
 
 ## 📋 Architecture
 
@@ -210,6 +210,12 @@ whatslang/
 │   └── llm_service.py     # LLM API wrapper
 ├── data/                  # Persistent data (gitignored)
 │   └── messages.db        # SQLite database
+├── docs/                  # Documentation
+│   ├── README.md          # Documentation index
+│   ├── QUICKSTART.md      # Quick start guide
+│   ├── DEPLOYMENT.md      # Deployment guide
+│   ├── PERSISTENCE.md     # Data persistence guide
+│   └── dev-notes/         # Development notes
 ├── frontend/              # Web dashboard
 │   ├── index.html         # Dashboard UI
 │   ├── app.js            # Frontend logic
@@ -220,7 +226,6 @@ whatslang/
 ├── pyproject.toml        # Python project metadata
 ├── requirements.txt      # Python dependencies
 ├── env.example          # Environment variables template
-├── PERSISTENCE.md        # Data persistence guide
 └── run.py               # Simple run script
 ```
 
@@ -470,7 +475,22 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## 📚 Additional Resources
+## 📚 Documentation
+
+### User Guides
+
+- **[📖 Quick Start Guide](docs/QUICKSTART.md)** - Get up and running in minutes
+- **[🚀 Deployment Guide](docs/DEPLOYMENT.md)** - Comprehensive deployment scenarios
+- **[💾 Data Persistence Guide](docs/PERSISTENCE.md)** - Understanding data persistence
+- **[🐍 Virtual Environment Guide](docs/VENV_GUIDE.md)** - Working with Python venvs
+- **[📝 Contributing Guide](CONTRIBUTING.md)** - Guidelines for contributors
+- **[📋 Changelog](CHANGELOG.md)** - Version history and changes
+
+### Documentation Index
+
+For a complete documentation overview, see **[docs/README.md](docs/README.md)**
+
+### Additional Resources
 
 - [FastAPI Documentation](https://fastapi.tiangolo.com/)
 - [Dokploy Documentation](https://dokploy.com/docs)

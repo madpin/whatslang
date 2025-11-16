@@ -1,0 +1,28 @@
+# Cursor-specific ignore patterns
+# These files are gitignored but might clutter Cursor's file explorer
+
+# Development notes (archived, not actively used)
+docs/dev-notes/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+data/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Build artifacts
+*.egg-info/
+build/
+dist/
+
+# Cache
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+

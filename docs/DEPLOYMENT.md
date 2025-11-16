@@ -644,7 +644,7 @@ The `/ready` endpoint provides operational metrics:
 
 ## Support
 
-- Documentation: See [README.md](README.md)
+- Documentation: See [README.md](../README.md)
 - Issues: GitHub Issues
 - Community: GitHub Discussions
 

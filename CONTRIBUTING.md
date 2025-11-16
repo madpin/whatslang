@@ -167,8 +167,8 @@ If you need to add a new dependency:
 When adding features:
 
 - Update `README.md` if it affects usage
-- Update `QUICKSTART.md` if it affects setup
-- Update `DEPLOYMENT.md` if it affects deployment
+- Update `docs/QUICKSTART.md` if it affects setup
+- Update `docs/DEPLOYMENT.md` if it affects deployment
 - Add inline code comments for complex logic
 - Update docstrings
 

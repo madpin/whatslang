@@ -325,7 +325,7 @@ Check terminal output
 
 ### Create Your Own Bot
 
-See the full guide in [README.md](README.md#creating-custom-bots)
+See the full guide in [README.md](../README.md#creating-custom-bots)
 
 Quick template:
 
@@ -358,13 +358,13 @@ Visit http://localhost:8000/docs for interactive API documentation
 
 ### Production Deployment
 
-See detailed production guide in [README.md](README.md#production-features)
+See detailed production guide in [README.md](../README.md#production-features)
 
 ---
 
 ## 🆘 Getting Help
 
-- 📖 **Full Documentation**: [README.md](README.md)
+- 📖 **Full Documentation**: [README.md](../README.md)
 - 🐛 **Report Issues**: GitHub Issues
 - 💬 **Questions**: GitHub Discussions
 
