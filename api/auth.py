@@ -9,9 +9,6 @@ from typing import Optional
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
-# Get password from environment variable
-DASHBOARD_PASSWORD = os.getenv("DASHBOARD_PASSWORD", "")
-
 class PasswordVerification(BaseModel):
     password: str
 
@@ -27,7 +24,10 @@ async def verify_password(data: PasswordVerification):
     
     Returns a simple token if password is correct
     """
-    if not DASHBOARD_PASSWORD:
+    # Read password at request time, not import time
+    dashboard_password = os.getenv("DASHBOARD_PASSWORD", "")
+    
+    if not dashboard_password:
         # If no password is set, allow access with warning
         return AuthResponse(
             success=True,
@@ -35,7 +35,7 @@ async def verify_password(data: PasswordVerification):
             token=secrets.token_urlsafe(32)
         )
     
-    if data.password == DASHBOARD_PASSWORD:
+    if data.password == dashboard_password:
         # Generate a simple session token
         token = secrets.token_urlsafe(32)
         return AuthResponse(
@@ -54,8 +54,11 @@ async def auth_status():
     """
     Check if authentication is required
     """
+    # Read password at request time, not import time
+    dashboard_password = os.getenv("DASHBOARD_PASSWORD", "")
+    
     return {
-        "auth_required": bool(DASHBOARD_PASSWORD),
-        "configured": bool(DASHBOARD_PASSWORD)
+        "auth_required": bool(dashboard_password),
+        "configured": bool(dashboard_password)
     }
 

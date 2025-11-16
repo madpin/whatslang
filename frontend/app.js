@@ -81,6 +81,35 @@ function saveStateToStorage() {
 }
 
 // ===================================
+// AUTHENTICATED API REQUESTS
+// ===================================
+
+/**
+ * Authenticated fetch wrapper that includes the Bearer token from sessionStorage
+ * @param {string} url - The URL to fetch
+ * @param {Object} options - Fetch options
+ * @returns {Promise<Response>} The fetch response
+ */
+async function authenticatedFetch(url, options = {}) {
+    // Get auth token from sessionStorage
+    const authToken = sessionStorage.getItem('auth_token');
+    
+    // Clone options to avoid mutating the original
+    const fetchOptions = { ...options };
+    
+    // Add Authorization header if token exists
+    if (authToken) {
+        fetchOptions.headers = {
+            ...fetchOptions.headers,
+            'Authorization': `Bearer ${authToken}`
+        };
+    }
+    
+    // Perform the fetch
+    return fetch(url, fetchOptions);
+}
+
+// ===================================
 // INITIALIZATION
 // ===================================
 
@@ -99,6 +128,13 @@ async function init() {
     window.deleteChat = deleteChat;
     window.toggleTableRowMessages = toggleTableRowMessages;
     window.goToCardsPage = goToCardsPage;
+    
+    // Check if we should add logout button (if authenticated)
+    const authToken = sessionStorage.getItem('auth_token');
+    if (authToken && typeof window.addLogoutButton === 'function') {
+        console.log('🔐 Auth token found, ensuring logout button is added...');
+        window.addLogoutButton();
+    }
     
     setupEventListeners();
     restoreFiltersUI();
@@ -428,7 +464,7 @@ async function loadChats() {
             params.append('page', 1);
         }
         
-        const response = await fetch(`${API_BASE_URL}/chats?${params}`);
+        const response = await authenticatedFetch(`${API_BASE_URL}/chats?${params}`);
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -492,7 +528,7 @@ async function loadChatsQuietly() {
             params.append('page', 1);
         }
         
-        const response = await fetch(`${API_BASE_URL}/chats?${params}`);
+        const response = await authenticatedFetch(`${API_BASE_URL}/chats?${params}`);
         if (!response.ok) return;
         
         const data = await response.json();
@@ -905,7 +941,7 @@ async function syncChats() {
     button.innerHTML = '<span class="loading-spinner"></span><span class="btn-text">Syncing...</span>';
     
     try {
-        const response = await fetch(`${API_BASE_URL}/chats/sync`, { method: 'POST' });
+        const response = await authenticatedFetch(`${API_BASE_URL}/chats/sync`, { method: 'POST' });
         
         if (!response.ok) {
             const error = await response.json();
@@ -966,7 +1002,7 @@ async function addChatManually() {
     button.innerHTML = '<span class="loading-spinner"></span><span class="btn-text">Adding...</span>';
     
     try {
-        const response = await fetch(`${API_BASE_URL}/chats`, {
+        const response = await authenticatedFetch(`${API_BASE_URL}/chats`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ chat_jid: chatJid, chat_name: chatName || null })
@@ -1005,7 +1041,7 @@ async function deleteChat(chatJid) {
     }
     
     try {
-        const response = await fetch(`${API_BASE_URL}/chats/${encodeURIComponent(chatJid)}`, {
+        const response = await authenticatedFetch(`${API_BASE_URL}/chats/${encodeURIComponent(chatJid)}`, {
             method: 'DELETE'
         });
         
@@ -1035,7 +1071,7 @@ async function startBot(botName, chatJid) {
         const url = `${API_BASE_URL}/bots/${encodeURIComponent(botName)}/start?chat_jid=${encodeURIComponent(chatJid)}`;
         console.log('Starting bot with URL:', url);
         
-        const response = await fetch(url, { method: 'POST' });
+        const response = await authenticatedFetch(url, { method: 'POST' });
         
         if (!response.ok) {
             const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
@@ -1053,7 +1089,7 @@ async function startBot(botName, chatJid) {
 
 async function stopBot(botName, chatJid) {
     try {
-        const response = await fetch(
+        const response = await authenticatedFetch(
             `${API_BASE_URL}/bots/${encodeURIComponent(botName)}/stop?chat_jid=${encodeURIComponent(chatJid)}`,
             { method: 'POST' }
         );
@@ -1103,7 +1139,7 @@ async function loadBotLogs(botName, chatJid) {
     if (!container) return;
     
     try {
-        const response = await fetch(
+        const response = await authenticatedFetch(
             `${API_BASE_URL}/bots/${encodeURIComponent(botName)}/logs?chat_jid=${encodeURIComponent(chatJid)}&limit=50`
         );
         
@@ -1169,7 +1205,7 @@ async function loadChatMessages(chatJid) {
     if (!container) return;
     
     try {
-        const response = await fetch(`${API_BASE_URL}/chats/${encodeURIComponent(chatJid)}/messages?limit=20`);
+        const response = await authenticatedFetch(`${API_BASE_URL}/chats/${encodeURIComponent(chatJid)}/messages?limit=20`);
         
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
@@ -1752,7 +1788,7 @@ async function loadChatMessagesTable(chatJid) {
     if (!container) return;
     
     try {
-        const response = await fetch(`${API_BASE_URL}/chats/${encodeURIComponent(chatJid)}/messages?limit=20`);
+        const response = await authenticatedFetch(`${API_BASE_URL}/chats/${encodeURIComponent(chatJid)}/messages?limit=20`);
         
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
@@ -2106,7 +2142,7 @@ async function bulkAction(action) {
     showToast(`Processing ${chatJids.length} chat(s)...`, 'info');
     
     try {
-        const response = await fetch(`${API_BASE_URL}/chats/bulk-action`, {
+        const response = await authenticatedFetch(`${API_BASE_URL}/chats/bulk-action`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

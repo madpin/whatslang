@@ -251,6 +251,50 @@ app.add_middleware(
 )
 
 
+# API authentication middleware
+@app.middleware("http")
+async def protect_api_endpoints(request: Request, call_next):
+    """Protect API endpoints with authentication when password is set."""
+    from api.middleware import AuthMiddleware
+    
+    # Check if password protection is enabled
+    dashboard_password = os.getenv("DASHBOARD_PASSWORD", "")
+    
+    if dashboard_password:
+        # Define public endpoints that don't require authentication
+        public_paths = [
+            "/",
+            "/favicon.ico",
+            "/health",
+            "/ready",
+            "/auth/verify",
+            "/auth/status",
+            "/docs",
+            "/redoc",
+            "/openapi.json",
+        ]
+        
+        # Allow all static files (protection handled by check-auth.js in browser)
+        if request.url.path.startswith("/static/"):
+            return await call_next(request)
+        
+        # Check if path is public
+        is_public = any(request.url.path == public_path for public_path in public_paths)
+        
+        # If not public and password is set, require authentication
+        if not is_public:
+            if not await AuthMiddleware.verify_token(request):
+                return JSONResponse(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    content={"detail": "Authentication required"},
+                    headers={"WWW-Authenticate": "Bearer"}
+                )
+    
+    # Process request
+    response = await call_next(request)
+    return response
+
+
 # Request logging middleware
 @app.middleware("http")
 async def log_requests(request: Request, call_next):

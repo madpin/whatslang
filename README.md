@@ -6,6 +6,20 @@
 
 A production-ready, modular WhatsApp bot service with a web dashboard for managing multiple concurrent bots. Built with FastAPI and designed for easy deployment with Docker and Nixpacks (dokploy).
 
+---
+
+## 📖 New to the Project?
+
+👉 **[Start with the Documentation Hub](docs/README.md)** 👈
+
+The hub provides structured learning paths from beginner to advanced, with guides for:
+- 🚀 Getting started (15 min)
+- 🤖 Creating custom bots (30 min)  
+- 🔐 Adding security (15 min)
+- ☁️ Production deployment (45 min)
+
+---
+
 ## ✨ Features
 
 - 🤖 **Multiple Bots**: Run multiple bots simultaneously on the same WhatsApp chat
@@ -477,20 +491,37 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 📚 Documentation
 
-### User Guides
+### 🎯 Choose Your Path
 
-- **[📖 Quick Start Guide](docs/QUICKSTART.md)** - Get up and running in minutes
-- **[🚀 Deployment Guide](docs/DEPLOYMENT.md)** - Comprehensive deployment scenarios
-- **[💾 Data Persistence Guide](docs/PERSISTENCE.md)** - Understanding data persistence
-- **[🐍 Virtual Environment Guide](docs/VENV_GUIDE.md)** - Working with Python venvs
-- **[📝 Contributing Guide](CONTRIBUTING.md)** - Guidelines for contributors
-- **[📋 Changelog](CHANGELOG.md)** - Version history and changes
+| I want to... | Read this | Time |
+|--------------|-----------|------|
+| 🚀 **Get started from scratch** | [Getting Started Guide](docs/GETTING_STARTED.md) | 15 min |
+| ⚡ **Quick setup (experienced users)** | [Quick Start](docs/QUICKSTART.md) | 5 min |
+| 🤖 **Create custom bots** | [Creating Bots Guide](docs/CREATING_BOTS.md) | 30 min |
+| 🔐 **Add password protection** | [Security Guide](docs/SECURITY.md) | 15 min |
+| ☁️ **Deploy to production** | [Deployment Guide](docs/DEPLOYMENT.md) | 45 min |
+| 💾 **Understand data storage** | [Persistence Guide](docs/PERSISTENCE.md) | 20 min |
+| 🐍 **Learn about virtual envs** | [Venv Guide](docs/VENV_GUIDE.md) | 10 min |
 
-### Documentation Index
+### 📖 Complete Documentation Hub
 
-For a complete documentation overview, see **[docs/README.md](docs/README.md)**
+**For the complete documentation with learning paths and detailed guides:**
 
-### Additional Resources
+👉 **[Visit the Documentation Hub](docs/README.md)** 👈
+
+The hub includes:
+- 📚 **4 learning paths** (beginner to expert)
+- 🎓 **9 comprehensive guides** covering all topics
+- 🗺️ **Quick task lookup** for common operations
+- 🆘 **Troubleshooting** for each area
+
+### 🤝 Contributing & Community
+
+- **[Contributing Guide](CONTRIBUTING.md)** - How to contribute
+- **[Changelog](CHANGELOG.md)** - Version history and changes
+- **[License](LICENSE)** - MIT License
+
+### 🔗 External Resources
 
 - [FastAPI Documentation](https://fastapi.tiangolo.com/)
 - [Dokploy Documentation](https://dokploy.com/docs)

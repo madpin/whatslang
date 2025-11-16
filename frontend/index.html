@@ -7,7 +7,6 @@
     <title>WhatsLang - Multi-Chat Bot Manager</title>
     <link rel="stylesheet" href="styles.css?v=20250116">
     <meta name="description" content="Modern dashboard for managing WhatsApp bots across multiple chats">
-    <script src="check-auth.js"></script>
 </head>
 <body>
     <!-- Mobile Menu Overlay -->
@@ -387,6 +386,9 @@
         </button>
     </nav>
 
+    <!-- Authentication check script - loaded first -->
+    <script src="check-auth.js?v=20250116"></script>
+    <!-- Main app script -->
     <script src="app.js?v=20250116"></script>
 </body>
 </html>

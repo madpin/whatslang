@@ -9,15 +9,15 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 # Simple bearer token security scheme
 security = HTTPBearer(auto_error=False)
 
-DASHBOARD_PASSWORD = os.getenv("DASHBOARD_PASSWORD", "")
-
 class AuthMiddleware:
     """Authentication middleware for protecting API endpoints"""
     
     @staticmethod
     def is_auth_required() -> bool:
         """Check if authentication is required"""
-        return bool(DASHBOARD_PASSWORD)
+        # Read at request time, not import time
+        dashboard_password = os.getenv("DASHBOARD_PASSWORD", "")
+        return bool(dashboard_password)
     
     @staticmethod
     async def verify_token(request: Request) -> bool:
