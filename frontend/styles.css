@@ -1285,6 +1285,24 @@ body {
     pointer-events: auto;
 }
 
+.messages-section-table {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.4s ease;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: var(--radius-md);
+    margin-top: var(--spacing-md);
+    pointer-events: none;
+}
+
+.messages-section-table.visible {
+    max-height: 400px;
+    overflow-y: auto;
+    pointer-events: auto;
+    padding: var(--spacing-md);
+    border: 1px solid var(--glass-border);
+}
+
 .messages-header {
     padding: var(--spacing-lg);
     display: flex;
@@ -1330,6 +1348,11 @@ body {
     display: flex;
     flex-direction: column;
     gap: var(--spacing-md);
+}
+
+.messages-section-table .messages-container {
+    padding: 0;
+    gap: var(--spacing-sm);
 }
 
 .message-bubble {

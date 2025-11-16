@@ -19,11 +19,15 @@ const state = {
     viewMode: 'cards', // 'cards' or 'table'
     searchQuery: '',
     
-    // Table/Pagination state
+    // Table/Pagination state (for table view)
     currentPage: 1,
     perPage: 20,
     sortBy: 'last_message_time',
     sortOrder: 'desc',
+    
+    // Cards pagination state
+    cardsCurrentPage: 1,
+    cardsPerPage: 12,
     
     // Filters
     filters: {
@@ -41,12 +45,50 @@ const state = {
     filterDebounceTimer: null
 };
 
+// Load state from localStorage on startup
+function loadStateFromStorage() {
+    try {
+        const savedViewMode = localStorage.getItem('viewMode');
+        if (savedViewMode) state.viewMode = savedViewMode;
+        
+        const savedFilters = localStorage.getItem('filters');
+        if (savedFilters) {
+            state.filters = JSON.parse(savedFilters);
+        }
+        
+        const savedPerPage = localStorage.getItem('perPage');
+        if (savedPerPage) state.perPage = parseInt(savedPerPage);
+        
+        const savedCardsPerPage = localStorage.getItem('cardsPerPage');
+        if (savedCardsPerPage) state.cardsPerPage = parseInt(savedCardsPerPage);
+        
+        console.log('✓ Loaded state from localStorage:', { viewMode: state.viewMode, filters: state.filters });
+    } catch (error) {
+        console.error('Failed to load state from localStorage:', error);
+    }
+}
+
+// Save state to localStorage
+function saveStateToStorage() {
+    try {
+        localStorage.setItem('viewMode', state.viewMode);
+        localStorage.setItem('filters', JSON.stringify(state.filters));
+        localStorage.setItem('perPage', state.perPage);
+        localStorage.setItem('cardsPerPage', state.cardsPerPage);
+    } catch (error) {
+        console.error('Failed to save state to localStorage:', error);
+    }
+}
+
 // ===================================
 // INITIALIZATION
 // ===================================
 
 async function init() {
     console.log('🚀 Initializing modern dashboard...');
+    
+    // Load saved state from localStorage
+    loadStateFromStorage();
     
     // Expose functions to global scope for inline onclick handlers
     window.startBot = startBot;
@@ -56,11 +98,36 @@ async function init() {
     window.toggleChat = toggleChat;
     window.toggleMessages = toggleMessages;
     window.deleteChat = deleteChat;
+    window.toggleTableRowMessages = toggleTableRowMessages;
+    window.goToCardsPage = goToCardsPage;
     
     setupEventListeners();
+    restoreFiltersUI();
     await loadChats();
     startAutoRefresh();
     updateDashboardStats();
+}
+
+// Restore filter UI from saved state
+function restoreFiltersUI() {
+    const activityFilter = document.getElementById('activityFilter');
+    const chatTypeFilter = document.getElementById('chatTypeFilter');
+    const botStatusFilter = document.getElementById('botStatusFilter');
+    const searchInput = document.getElementById('searchChats');
+    const perPageSelect = document.getElementById('perPageSelect');
+    
+    if (activityFilter && state.filters.activity) activityFilter.value = state.filters.activity;
+    if (chatTypeFilter && state.filters.chatType) chatTypeFilter.value = state.filters.chatType;
+    if (botStatusFilter && state.filters.botStatus) botStatusFilter.value = state.filters.botStatus;
+    if (searchInput && state.filters.search) {
+        searchInput.value = state.filters.search;
+        state.searchQuery = state.filters.search.toLowerCase();
+    }
+    if (perPageSelect) perPageSelect.value = state.perPage;
+    
+    // Set correct view mode buttons
+    document.getElementById('tableViewBtn')?.classList.toggle('active', state.viewMode === 'table');
+    document.getElementById('cardsViewBtn')?.classList.toggle('active', state.viewMode === 'cards');
 }
 
 function setupEventListeners() {
@@ -116,13 +183,15 @@ function setupEventListeners() {
             state.filters.search = query;
             state.searchQuery = query.toLowerCase();
             state.currentPage = 1; // Reset to first page on search
+            state.cardsCurrentPage = 1;
+            saveStateToStorage();
             
             if (state.viewMode === 'table') {
                 loadChats();
             } else if (state.currentView === 'bots') {
                 displayBotsView();
             } else {
-                filterChats();
+                applyFiltersToCards();
             }
         }, 300);
     });
@@ -131,19 +200,37 @@ function setupEventListeners() {
     document.getElementById('activityFilter')?.addEventListener('change', (e) => {
         state.filters.activity = e.target.value;
         state.currentPage = 1;
-        loadChats();
+        state.cardsCurrentPage = 1;
+        saveStateToStorage();
+        if (state.viewMode === 'table') {
+            loadChats();
+        } else {
+            applyFiltersToCards();
+        }
     });
 
     document.getElementById('chatTypeFilter')?.addEventListener('change', (e) => {
         state.filters.chatType = e.target.value;
         state.currentPage = 1;
-        loadChats();
+        state.cardsCurrentPage = 1;
+        saveStateToStorage();
+        if (state.viewMode === 'table') {
+            loadChats();
+        } else {
+            applyFiltersToCards();
+        }
     });
 
     document.getElementById('botStatusFilter')?.addEventListener('change', (e) => {
         state.filters.botStatus = e.target.value;
         state.currentPage = 1;
-        loadChats();
+        state.cardsCurrentPage = 1;
+        saveStateToStorage();
+        if (state.viewMode === 'table') {
+            loadChats();
+        } else {
+            applyFiltersToCards();
+        }
     });
 
     document.getElementById('clearFiltersBtn')?.addEventListener('click', clearFilters);
@@ -161,6 +248,7 @@ function setupEventListeners() {
     document.getElementById('perPageSelect')?.addEventListener('change', (e) => {
         state.perPage = parseInt(e.target.value);
         state.currentPage = 1;
+        saveStateToStorage();
         loadChats();
     });
 
@@ -334,6 +422,10 @@ async function loadChats() {
             if (state.filters.chatType) params.append('chat_type', state.filters.chatType);
             if (state.filters.botStatus) params.append('bot_status', state.filters.botStatus);
             if (state.filters.search) params.append('search', state.filters.search);
+        } else {
+            // In cards mode, fetch all chats for client-side filtering/pagination
+            params.append('per_page', 10000); // Fetch all chats
+            params.append('page', 1);
         }
         
         const response = await fetch(`${API_BASE_URL}/chats?${params}`);
@@ -384,7 +476,23 @@ async function loadChats() {
 
 async function loadChatsQuietly() {
     try {
-        const response = await fetch(`${API_BASE_URL}/chats`);
+        // Fetch all chats for cards mode, or current page for table mode
+        const params = new URLSearchParams();
+        if (state.viewMode === 'table') {
+            params.append('page', state.currentPage);
+            params.append('per_page', state.perPage);
+            params.append('sort', state.sortBy);
+            params.append('order', state.sortOrder);
+            if (state.filters.activity) params.append('activity', state.filters.activity);
+            if (state.filters.chatType) params.append('chat_type', state.filters.chatType);
+            if (state.filters.botStatus) params.append('bot_status', state.filters.botStatus);
+            if (state.filters.search) params.append('search', state.filters.search);
+        } else {
+            params.append('per_page', 10000);
+            params.append('page', 1);
+        }
+        
+        const response = await fetch(`${API_BASE_URL}/chats?${params}`);
         if (!response.ok) return;
         
         const data = await response.json();
@@ -479,24 +587,28 @@ function displayChats(chats) {
         chats = [];
     }
     
-    const filteredChats = state.searchQuery 
-        ? chats.filter(chat => 
-            chat.chat_name.toLowerCase().includes(state.searchQuery) ||
-            chat.chat_jid.toLowerCase().includes(state.searchQuery)
-          )
-        : chats;
+    // Apply filters
+    let filteredChats = applyCardFilters(chats);
+    
+    // Apply pagination
+    const startIdx = (state.cardsCurrentPage - 1) * state.cardsPerPage;
+    const endIdx = startIdx + state.cardsPerPage;
+    const paginatedChats = filteredChats.slice(startIdx, endIdx);
 
-    if (filteredChats.length === 0 && state.searchQuery) {
+    if (filteredChats.length === 0 && (state.searchQuery || hasActiveFilters())) {
         container.innerHTML = `
             <div class="empty-state glass-card" style="grid-column: 1 / -1;">
                 <div class="empty-icon">🔍</div>
                 <h3 class="empty-title">No matches found</h3>
-                <p class="empty-text">Try a different search term</p>
+                <p class="empty-text">Try adjusting your filters or search term</p>
             </div>
         `;
     } else {
-        container.innerHTML = filteredChats.map(chat => createChatCard(chat)).join('');
+        container.innerHTML = paginatedChats.map(chat => createChatCard(chat)).join('');
     }
+    
+    // Render cards pagination
+    renderCardsPagination(filteredChats.length);
     
     // Refresh logs for expanded bots
     for (const key of state.expandedLogs) {
@@ -509,8 +621,88 @@ function displayChats(chats) {
         loadChatMessages(chatJid);
     }
     
-    document.getElementById('no-chats').style.display = 'none';
+    // Ensure proper container visibility for cards view
+    const tableContainer = document.getElementById('table-view-container');
+    const noChatsDiv = document.getElementById('no-chats');
+    
+    if (noChatsDiv) noChatsDiv.style.display = 'none';
+    if (tableContainer) tableContainer.style.display = 'none';
     container.style.display = 'grid';
+}
+
+// Apply filters to cards in client-side
+function applyCardFilters(chats) {
+    let filtered = [...chats];
+    
+    // Search filter
+    if (state.searchQuery) {
+        filtered = filtered.filter(chat => 
+            chat.chat_name.toLowerCase().includes(state.searchQuery) ||
+            chat.chat_jid.toLowerCase().includes(state.searchQuery)
+        );
+    }
+    
+    // Activity filter
+    if (state.filters.activity) {
+        const now = new Date();
+        filtered = filtered.filter(chat => {
+            if (!chat.last_message_time) return state.filters.activity === 'idle';
+            
+            const lastMsg = new Date(chat.last_message_time);
+            const diffHours = (now - lastMsg) / (1000 * 60 * 60);
+            
+            if (state.filters.activity === 'active') {
+                return diffHours < 24;
+            } else if (state.filters.activity === 'recent') {
+                return diffHours >= 24 && diffHours < 168;
+            } else if (state.filters.activity === 'idle') {
+                return diffHours >= 168 || !chat.last_message_time;
+            }
+            return true;
+        });
+    }
+    
+    // Chat type filter
+    if (state.filters.chatType) {
+        filtered = filtered.filter(chat => {
+            if (state.filters.chatType === 'group') {
+                return chat.chat_jid.includes('@g.us');
+            } else if (state.filters.chatType === 'individual') {
+                return chat.chat_jid.includes('@s.whatsapp.net');
+            }
+            return true;
+        });
+    }
+    
+    // Bot status filter
+    if (state.filters.botStatus) {
+        filtered = filtered.filter(chat => {
+            const runningBots = chat.bots.filter(b => b.status === 'running');
+            const enabledBots = chat.bots.filter(b => b.enabled);
+            
+            if (state.filters.botStatus === 'running') {
+                return runningBots.length > 0;
+            } else if (state.filters.botStatus === 'enabled') {
+                return enabledBots.length > 0;
+            } else if (state.filters.botStatus === 'none') {
+                return chat.bots.length === 0 || (runningBots.length === 0 && enabledBots.length === 0);
+            }
+            return true;
+        });
+    }
+    
+    return filtered;
+}
+
+// Helper to check if there are active filters
+function hasActiveFilters() {
+    return state.filters.activity || state.filters.chatType || state.filters.botStatus;
+}
+
+// Apply filters to cards view (called when filters change in cards mode)
+function applyFiltersToCards() {
+    state.cardsCurrentPage = 1; // Reset to first page when filters change
+    displayChats(state.chats);
 }
 
 function createChatCard(chat) {
@@ -739,6 +931,15 @@ async function syncChats() {
         
         const result = await response.json();
         showToast(result.message, 'success');
+        
+        // Reset to first page to see newly synced chats
+        state.currentPage = 1;
+        state.cardsCurrentPage = 1;
+        
+        // Wait a moment for the backend to finish processing
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Reload chats with current view mode
         await loadChats();
         
     } catch (error) {
@@ -746,7 +947,7 @@ async function syncChats() {
         showToast(`Failed to sync: ${error.message}`, 'error');
     } finally {
         button.innerHTML = originalHtml;
-            button.disabled = false;
+        button.disabled = false;
     }
 }
 
@@ -1366,19 +1567,21 @@ function switchViewMode(mode) {
     // Show/hide appropriate containers
     const tableContainer = document.getElementById('table-view-container');
     const cardsContainer = document.getElementById('chats-container');
+    const cardsPagination = document.getElementById('cards-pagination-controls');
     
     if (mode === 'table') {
         tableContainer.style.display = 'block';
         cardsContainer.style.display = 'none';
+        if (cardsPagination) cardsPagination.style.display = 'none';
         loadChats();
     } else {
         tableContainer.style.display = 'none';
         cardsContainer.style.display = 'grid';
-        displayChats(state.chats);
+        applyFiltersToCards();
     }
     
     // Save preference
-    localStorage.setItem('viewMode', mode);
+    saveStateToStorage();
 }
 
 // ===================================
@@ -1387,7 +1590,18 @@ function switchViewMode(mode) {
 
 function displayTableView() {
     const tbody = document.getElementById('chatsTableBody');
+    const tableContainer = document.getElementById('table-view-container');
+    const cardsContainer = document.getElementById('chats-container');
+    const noChatsDiv = document.getElementById('no-chats');
+    const cardsPagination = document.getElementById('cards-pagination-controls');
+    
     if (!tbody) return;
+    
+    // Ensure proper container visibility for table view
+    if (tableContainer) tableContainer.style.display = 'block';
+    if (cardsContainer) cardsContainer.style.display = 'none';
+    if (noChatsDiv) noChatsDiv.style.display = 'none';
+    if (cardsPagination) cardsPagination.style.display = 'none';
     
     if (state.chats.length === 0) {
         tbody.innerHTML = `
@@ -1491,7 +1705,7 @@ function createTableRow(chat) {
                     <button class="table-action-btn expand" title="Expand" onclick="toggleTableRow('${escapeAttr(chat.chat_jid)}')">
                         ${isExpanded ? '▲' : '▼'}
                     </button>
-                    <button class="table-action-btn" title="View Messages" onclick="toggleMessages('${escapeAttr(chat.chat_jid)}')">
+                    <button class="table-action-btn" title="View Messages" onclick="toggleTableRowMessages('${escapeAttr(chat.chat_jid)}')">
                         💬
                     </button>
                     <button class="table-action-btn danger" title="Delete" onclick="deleteChat('${escapeAttr(chat.chat_jid)}')">
@@ -1511,6 +1725,9 @@ function createTableRow(chat) {
 }
 
 function createExpandedRow(chat) {
+    const safeJid = makeSafeId(chat.chat_jid);
+    const messagesVisible = state.expandedMessages.has(chat.chat_jid);
+    
     const botsHtml = chat.bots.map(bot => {
         const isRunning = bot.status === 'running';
         const uptimeText = bot.uptime_seconds ? formatUptime(bot.uptime_seconds) : 'N/A';
@@ -1567,6 +1784,11 @@ function createExpandedRow(chat) {
                             <p>Last activity: ${chat.last_message_time ? formatRelativeTime(new Date(chat.last_message_time)) : 'Never'}</p>
                             <p>Added: ${formatRelativeTime(new Date(chat.added_at))}</p>
                         </div>
+                        <div class="messages-section-table ${messagesVisible ? 'visible' : ''}" id="messages-table-${safeJid}">
+                            <div class="messages-container" id="messages-container-table-${safeJid}">
+                                <p style="color: var(--text-muted);">Loading messages...</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </td>
@@ -1581,6 +1803,79 @@ function toggleTableRow(chatJid) {
         state.expandedTableRows.add(chatJid);
     }
     displayTableView();
+}
+
+// Toggle messages in table view
+async function toggleTableRowMessages(chatJid) {
+    const safeJid = makeSafeId(chatJid);
+    const messagesSection = document.getElementById(`messages-table-${safeJid}`);
+    
+    if (!messagesSection) {
+        console.error(`Messages section not found for: ${chatJid}`);
+        return;
+    }
+    
+    if (messagesSection.classList.contains('visible')) {
+        messagesSection.classList.remove('visible');
+        state.expandedMessages.delete(chatJid);
+    } else {
+        messagesSection.classList.add('visible');
+        state.expandedMessages.add(chatJid);
+        await loadChatMessagesTable(chatJid);
+    }
+}
+
+// Load messages for table view
+async function loadChatMessagesTable(chatJid) {
+    const safeJid = makeSafeId(chatJid);
+    const container = document.getElementById(`messages-container-table-${safeJid}`);
+    
+    if (!container) return;
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/chats/${encodeURIComponent(chatJid)}/messages?limit=20`);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        displayMessagesInTable(chatJid, data.results.messages);
+        
+    } catch (error) {
+        console.error(`Error loading messages for ${chatJid}:`, error);
+        if (container) {
+            container.innerHTML = `<p style="color: var(--danger);">Failed to load messages: ${error.message}</p>`;
+        }
+    }
+}
+
+// Display messages in table view
+function displayMessagesInTable(chatJid, messages) {
+    const safeJid = makeSafeId(chatJid);
+    const container = document.getElementById(`messages-container-table-${safeJid}`);
+    
+    if (!container) return;
+    
+    if (messages.length === 0) {
+        container.innerHTML = '<p style="color: var(--text-muted);">No messages available</p>';
+        return;
+    }
+    
+    container.innerHTML = messages.map(msg => {
+        const timestamp = msg.timestamp ? formatRelativeTime(new Date(msg.timestamp)) : 'Unknown time';
+        const sender = msg.sender_jid || msg.from || 'Unknown';
+        const content = msg.content || msg.text || '[No text content]';
+        const isFromMe = msg.is_from_me ? 'from-me' : 'from-them';
+        
+        return `
+            <div class="message-bubble ${isFromMe}">
+                ${!msg.is_from_me ? `<div class="message-sender">${escapeHtml(sender)}</div>` : ''}
+                <div class="message-content">${escapeHtml(content)}</div>
+                <div class="message-timestamp">${timestamp}</div>
+            </div>
+        `;
+    }).join('');
 }
 
 // ===================================
@@ -1638,6 +1933,126 @@ function goToPage(page) {
 }
 
 // ===================================
+// CARDS PAGINATION
+// ===================================
+
+function renderCardsPagination(totalFilteredChats) {
+    // Find or create pagination container for cards
+    let paginationContainer = document.getElementById('cards-pagination-controls');
+    
+    if (!paginationContainer) {
+        // Create pagination container
+        const chatsSection = document.querySelector('.chats-section');
+        paginationContainer = document.createElement('div');
+        paginationContainer.id = 'cards-pagination-controls';
+        paginationContainer.className = 'pagination-controls glass-card';
+        paginationContainer.style.marginTop = 'var(--spacing-lg)';
+        
+        // Insert before the table-view-container or after chats-container
+        const chatsContainer = document.getElementById('chats-container');
+        chatsContainer.parentNode.insertBefore(paginationContainer, chatsContainer.nextSibling);
+    }
+    
+    const totalPages = Math.ceil(totalFilteredChats / state.cardsPerPage);
+    
+    // Hide pagination if in table view, only one page, or no results
+    if (state.viewMode === 'table' || totalPages <= 1) {
+        paginationContainer.style.display = 'none';
+        return;
+    }
+    
+    paginationContainer.style.display = 'flex';
+    
+    // Generate page numbers
+    let startPage = Math.max(1, state.cardsCurrentPage - 2);
+    let endPage = Math.min(totalPages, state.cardsCurrentPage + 2);
+    
+    if (state.cardsCurrentPage <= 3) {
+        endPage = Math.min(5, totalPages);
+    } else if (state.cardsCurrentPage >= totalPages - 2) {
+        startPage = Math.max(1, totalPages - 4);
+    }
+    
+    const pageButtons = [];
+    for (let i = startPage; i <= endPage; i++) {
+        pageButtons.push(`
+            <button class="pagination-btn ${i === state.cardsCurrentPage ? 'active' : ''}" 
+                    onclick="goToCardsPage(${i})">
+                ${i}
+            </button>
+        `);
+    }
+    
+    paginationContainer.innerHTML = `
+        <div class="pagination-info">
+            <span>Page ${state.cardsCurrentPage} of ${totalPages} (${totalFilteredChats} chats)</span>
+        </div>
+        
+        <div class="pagination-buttons">
+            <button class="pagination-btn" 
+                    onclick="goToCardsPage(1)" 
+                    ${state.cardsCurrentPage === 1 ? 'disabled' : ''}>
+                <span>««</span>
+            </button>
+            <button class="pagination-btn" 
+                    onclick="goToCardsPage(${state.cardsCurrentPage - 1})" 
+                    ${state.cardsCurrentPage === 1 ? 'disabled' : ''}>
+                <span>‹</span>
+            </button>
+            
+            <div class="page-numbers">
+                ${pageButtons.join('')}
+            </div>
+            
+            <button class="pagination-btn" 
+                    onclick="goToCardsPage(${state.cardsCurrentPage + 1})" 
+                    ${state.cardsCurrentPage === totalPages ? 'disabled' : ''}>
+                <span>›</span>
+            </button>
+            <button class="pagination-btn" 
+                    onclick="goToCardsPage(${totalPages})" 
+                    ${state.cardsCurrentPage === totalPages ? 'disabled' : ''}>
+                <span>»»</span>
+            </button>
+        </div>
+        
+        <div class="pagination-size">
+            <label>Per page:</label>
+            <select class="per-page-select" id="cardsPerPageSelect" onchange="handleCardsPerPageChange(this.value)">
+                <option value="6" ${state.cardsPerPage === 6 ? 'selected' : ''}>6</option>
+                <option value="12" ${state.cardsPerPage === 12 ? 'selected' : ''}>12</option>
+                <option value="24" ${state.cardsPerPage === 24 ? 'selected' : ''}>24</option>
+                <option value="48" ${state.cardsPerPage === 48 ? 'selected' : ''}>48</option>
+            </select>
+        </div>
+    `;
+}
+
+function goToCardsPage(page) {
+    const filteredChats = applyCardFilters(state.chats);
+    const totalPages = Math.ceil(filteredChats.length / state.cardsPerPage);
+    
+    if (page < 1 || page > totalPages) return;
+    
+    state.cardsCurrentPage = page;
+    displayChats(state.chats);
+    
+    // Scroll to top of chats section
+    document.querySelector('.chats-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function handleCardsPerPageChange(value) {
+    state.cardsPerPage = parseInt(value);
+    state.cardsCurrentPage = 1;
+    saveStateToStorage();
+    displayChats(state.chats);
+}
+
+// Make functions globally available
+window.goToCardsPage = goToCardsPage;
+window.handleCardsPerPageChange = handleCardsPerPageChange;
+
+// ===================================
 // FILTERING & SORTING
 // ===================================
 
@@ -1649,12 +2064,17 @@ function clearFilters() {
         search: ''
     };
     state.currentPage = 1;
+    state.cardsCurrentPage = 1;
     
     document.getElementById('activityFilter').value = '';
     document.getElementById('chatTypeFilter').value = '';
     document.getElementById('botStatusFilter').value = '';
     document.getElementById('searchChats').value = '';
+    state.searchQuery = '';
     
+    saveStateToStorage();
+    
+    // Always reload chats to ensure fresh data
     loadChats();
 }
 
