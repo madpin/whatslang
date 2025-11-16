@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Eye, RefreshCw, Download } from 'lucide-react'
+import { Plus, Eye, RefreshCw, Download, Trash2 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -17,17 +17,25 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { useChats, useCreateChat, useSyncChat, useSyncAllChats } from '@/hooks/useChats'
+import { useChats, useCreateChat, useSyncChat, useDeleteChat, useBulkDeleteUnassignedChats } from '@/hooks/useChats'
 import { formatDate } from '@/lib/utils'
 import type { ChatCreate, ChatType } from '@/types/chat'
+import ImportChatsDialog from '@/components/chats/ImportChatsDialog'
 
 export default function Chats() {
   const { data, isLoading } = useChats(30000)
   const createChat = useCreateChat()
   const syncChat = useSyncChat()
-  const syncAllChats = useSyncAllChats()
+  const deleteChat = useDeleteChat()
+  const bulkDeleteUnassigned = useBulkDeleteUnassignedChats()
+  
   const [search, setSearch] = useState('')
   const [showDialog, setShowDialog] = useState(false)
+  const [showImportDialog, setShowImportDialog] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false)
+  const [chatToDelete, setChatToDelete] = useState<string | null>(null)
+  
   const [formData, setFormData] = useState<ChatCreate>({
     jid: '',
     name: '',
@@ -53,9 +61,41 @@ export default function Chats() {
     syncChat.mutate(id)
   }
 
-  const handleSyncAll = () => {
-    syncAllChats.mutate()
+  const handleDeleteClick = (id: string, botCount: number) => {
+    if (botCount > 0) {
+      return // Button should be disabled, but double check
+    }
+    setChatToDelete(id)
+    setShowDeleteConfirm(true)
   }
+
+  const handleDeleteConfirm = () => {
+    if (!chatToDelete) return
+    deleteChat.mutate(chatToDelete, {
+      onSuccess: () => {
+        setShowDeleteConfirm(false)
+        setChatToDelete(null)
+      }
+    })
+  }
+
+  const handleBulkDeleteClick = () => {
+    const unassignedCount = data?.chats.filter(chat => (chat.bot_count ?? 0) === 0).length ?? 0
+    if (unassignedCount === 0) {
+      return
+    }
+    setShowBulkDeleteConfirm(true)
+  }
+
+  const handleBulkDeleteConfirm = () => {
+    bulkDeleteUnassigned.mutate(undefined, {
+      onSuccess: () => {
+        setShowBulkDeleteConfirm(false)
+      }
+    })
+  }
+
+  const unassignedCount = data?.chats.filter(chat => (chat.bot_count ?? 0) === 0).length ?? 0
 
   return (
     <div className="space-y-6">
@@ -68,12 +108,19 @@ export default function Chats() {
         </div>
         <div className="flex gap-2">
           <Button 
-            onClick={handleSyncAll}
+            onClick={() => setShowImportDialog(true)}
             variant="outline"
-            disabled={syncAllChats.isPending}
           >
             <Download className="mr-2 h-4 w-4" />
-            {syncAllChats.isPending ? 'Syncing...' : 'Sync All from WhatsApp'}
+            Import from WhatsApp
+          </Button>
+          <Button
+            onClick={handleBulkDeleteClick}
+            variant="outline"
+            disabled={unassignedCount === 0 || bulkDeleteUnassigned.isPending}
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            Delete All Unassigned ({unassignedCount})
           </Button>
           <Button onClick={() => setShowDialog(true)}>
             <Plus className="mr-2 h-4 w-4" />
@@ -124,6 +171,7 @@ export default function Chats() {
                   <TableHead>Name</TableHead>
                   <TableHead>JID</TableHead>
                   <TableHead>Type</TableHead>
+                  <TableHead>Bots</TableHead>
                   <TableHead>Last Activity</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -142,6 +190,11 @@ export default function Chats() {
                     <TableCell>
                       <Badge variant={chat.chat_type === 'group' ? 'default' : 'secondary'}>
                         {chat.chat_type}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">
+                        {chat.bot_count ?? 0} bot{(chat.bot_count ?? 0) !== 1 ? 's' : ''}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
@@ -167,6 +220,16 @@ export default function Chats() {
                           <Link to={`/chats/${chat.id}`}>
                             <Eye className="h-4 w-4" />
                           </Link>
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteClick(chat.id, chat.bot_count ?? 0)}
+                          disabled={(chat.bot_count ?? 0) > 0}
+                          title={(chat.bot_count ?? 0) > 0 ? 'Remove bots before deleting' : 'Delete chat'}
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </TableCell>
@@ -234,6 +297,70 @@ export default function Chats() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import Chats Dialog */}
+      <ImportChatsDialog 
+        open={showImportDialog} 
+        onOpenChange={setShowImportDialog}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Chat?</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this chat? This action cannot be undone.
+              All messages associated with this chat will also be deleted.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setShowDeleteConfirm(false)}
+              disabled={deleteChat.isPending}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={handleDeleteConfirm}
+              disabled={deleteChat.isPending}
+            >
+              {deleteChat.isPending ? 'Deleting...' : 'Delete Chat'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Delete Confirmation Dialog */}
+      <Dialog open={showBulkDeleteConfirm} onOpenChange={setShowBulkDeleteConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete All Unassigned Chats?</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete all {unassignedCount} chat{unassignedCount !== 1 ? 's' : ''} without bot assignments? 
+              This action cannot be undone. All messages associated with these chats will also be deleted.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setShowBulkDeleteConfirm(false)}
+              disabled={bulkDeleteUnassigned.isPending}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={handleBulkDeleteConfirm}
+              disabled={bulkDeleteUnassigned.isPending}
+            >
+              {bulkDeleteUnassigned.isPending ? 'Deleting...' : `Delete ${unassignedCount} Chat${unassignedCount !== 1 ? 's' : ''}`}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

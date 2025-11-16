@@ -8,7 +8,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models import Chat, ChatBot, Bot, ChatType as ChatTypeModel
+from app.models import Chat, ChatBot, Bot, ChatType as ChatTypeModel, User
 from app.schemas.chat import (
     ChatCreate,
     ChatUpdate,
@@ -17,8 +17,11 @@ from app.schemas.chat import (
     ChatBotAssignmentCreate,
     ChatBotAssignmentUpdate,
     ChatBotAssignmentResponse,
+    WhatsAppChatPreview,
+    WhatsAppChatPreviewResponse,
+    ImportSelectedChatsRequest,
 )
-from app.core import BotManager
+from app.core import BotManager, get_current_user
 from app.services import WhatsAppClient
 
 logger = logging.getLogger(__name__)
@@ -41,7 +44,8 @@ def get_whatsapp_client_dependency() -> WhatsAppClient:
 async def list_chats(
     skip: int = 0,
     limit: int = 100,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """List all chats"""
     # Get total count
@@ -49,18 +53,30 @@ async def list_chats(
     count_result = await db.execute(count_stmt)
     total = count_result.scalar_one()
     
-    # Get chats
+    # Get chats with bot count
     stmt = (
-        select(Chat)
+        select(
+            Chat,
+            func.count(ChatBot.id).label('bot_count')
+        )
+        .outerjoin(ChatBot, Chat.id == ChatBot.chat_id)
+        .group_by(Chat.id)
         .offset(skip)
         .limit(limit)
         .order_by(Chat.last_message_at.desc().nulls_last(), Chat.created_at.desc())
     )
     result = await db.execute(stmt)
-    chats = result.scalars().all()
+    rows = result.all()
+    
+    # Build response with bot_count
+    chat_responses = []
+    for chat, bot_count in rows:
+        chat_data = ChatResponse.model_validate(chat)
+        chat_data.bot_count = bot_count
+        chat_responses.append(chat_data)
     
     return ChatListResponse(
-        chats=[ChatResponse.model_validate(chat) for chat in chats],
+        chats=chat_responses,
         total=total
     )
 
@@ -68,7 +84,8 @@ async def list_chats(
 @router.post("", response_model=ChatResponse, status_code=status.HTTP_201_CREATED)
 async def create_chat(
     chat_data: ChatCreate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """Create a new chat"""
     # Check if chat already exists
@@ -102,7 +119,8 @@ async def create_chat(
 @router.get("/{chat_id}", response_model=ChatResponse)
 async def get_chat(
     chat_id: str,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """Get a chat by ID"""
     stmt = select(Chat).where(Chat.id == chat_id)
@@ -122,7 +140,8 @@ async def get_chat(
 async def update_chat(
     chat_id: str,
     chat_data: ChatUpdate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """Update a chat"""
     stmt = select(Chat).where(Chat.id == chat_id)
@@ -151,11 +170,47 @@ async def update_chat(
     return ChatResponse.model_validate(chat)
 
 
+@router.delete("/{chat_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_chat(
+    chat_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Delete a chat (only if no bots are assigned)"""
+    stmt = select(Chat).where(Chat.id == chat_id)
+    result = await db.execute(stmt)
+    chat = result.scalar_one_or_none()
+    
+    if not chat:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Chat not found"
+        )
+    
+    # Check if chat has any bot assignments
+    bot_stmt = select(func.count(ChatBot.id)).where(ChatBot.chat_id == chat_id)
+    bot_result = await db.execute(bot_stmt)
+    bot_count = bot_result.scalar_one()
+    
+    if bot_count > 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot delete chat with {bot_count} bot assignment(s). Remove bots first."
+        )
+    
+    # Delete chat (cascade will handle messages)
+    await db.delete(chat)
+    await db.flush()
+    
+    logger.info(f"Deleted chat: {chat_id} ({chat.jid})")
+
+
 @router.post("/{chat_id}/sync", response_model=ChatResponse)
 async def sync_chat(
     chat_id: str,
     db: AsyncSession = Depends(get_db),
-    whatsapp: Annotated[WhatsAppClient, Depends(get_whatsapp_client_dependency)] = None
+    whatsapp: Annotated[WhatsAppClient, Depends(get_whatsapp_client_dependency)] = None,
+    current_user: User = Depends(get_current_user)
 ):
     """Sync chat information from WhatsApp"""
     stmt = select(Chat).where(Chat.id == chat_id)
@@ -186,10 +241,57 @@ async def sync_chat(
     return ChatResponse.model_validate(chat)
 
 
+@router.get("/preview", response_model=WhatsAppChatPreviewResponse)
+async def preview_whatsapp_chats(
+    db: AsyncSession = Depends(get_db),
+    whatsapp: Annotated[WhatsAppClient, Depends(get_whatsapp_client_dependency)] = None,
+    current_user: User = Depends(get_current_user)
+):
+    """Preview all chats from WhatsApp without importing them"""
+    # Fetch all chats from WhatsApp
+    whatsapp_chats = await whatsapp.get_all_chats()
+    
+    # Get all existing JIDs from database
+    stmt = select(Chat.jid)
+    result = await db.execute(stmt)
+    existing_jids = set(result.scalars().all())
+    
+    # Build preview response
+    preview_chats = []
+    for wa_chat in whatsapp_chats:
+        jid = wa_chat.get("jid")
+        if not jid:
+            continue
+        
+        name = wa_chat.get("name", "")
+        
+        # Determine chat type
+        chat_type = "group" if jid.endswith("@g.us") else "private"
+        
+        # Get last message timestamp if available
+        last_message_time = wa_chat.get("last_message_time")
+        
+        # Check if chat already exists
+        exists = jid in existing_jids
+        
+        preview_chats.append(WhatsAppChatPreview(
+            jid=jid,
+            name=name,
+            chat_type=chat_type,
+            last_message_time=last_message_time,
+            exists=exists
+        ))
+    
+    logger.info(f"Previewed {len(preview_chats)} WhatsApp chats ({len([c for c in preview_chats if not c.exists])} new)")
+    
+    return WhatsAppChatPreviewResponse(chats=preview_chats)
+
+
 @router.post("/sync-all")
 async def sync_all_chats(
     db: AsyncSession = Depends(get_db),
-    whatsapp: Annotated[WhatsAppClient, Depends(get_whatsapp_client_dependency)] = None
+    whatsapp: Annotated[WhatsAppClient, Depends(get_whatsapp_client_dependency)] = None,
+    current_user: User = Depends(get_current_user)
 ):
     """Sync all chats from WhatsApp"""
     # Fetch all chats from WhatsApp
@@ -259,12 +361,133 @@ async def sync_all_chats(
     }
 
 
+@router.post("/import-selected")
+async def import_selected_chats(
+    request: ImportSelectedChatsRequest,
+    db: AsyncSession = Depends(get_db),
+    whatsapp: Annotated[WhatsAppClient, Depends(get_whatsapp_client_dependency)] = None,
+    current_user: User = Depends(get_current_user)
+):
+    """Import only selected chats from WhatsApp by JID"""
+    # Fetch all chats from WhatsApp
+    whatsapp_chats = await whatsapp.get_all_chats()
+    
+    # Filter to only requested JIDs
+    jids_to_import = set(request.jids)
+    filtered_chats = [chat for chat in whatsapp_chats if chat.get("jid") in jids_to_import]
+    
+    created_count = 0
+    updated_count = 0
+    
+    for wa_chat in filtered_chats:
+        jid = wa_chat.get("jid")
+        if not jid:
+            continue
+        
+        name = wa_chat.get("name", "")
+        
+        # Determine chat type
+        chat_type = ChatTypeModel.GROUP if jid.endswith("@g.us") else ChatTypeModel.PRIVATE
+        
+        # Extract last message timestamp if available
+        last_message_at = None
+        if "last_message_time" in wa_chat:
+            try:
+                # Parse ISO 8601 timestamp (e.g., "2025-11-15T20:09:10Z")
+                time_str = wa_chat["last_message_time"]
+                # Remove 'Z' and parse as UTC
+                if time_str.endswith('Z'):
+                    time_str = time_str[:-1] + '+00:00'
+                dt = datetime.fromisoformat(time_str)
+                # Remove timezone info to match database column (TIMESTAMP WITHOUT TIME ZONE)
+                last_message_at = dt.replace(tzinfo=None)
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Failed to parse last message time for {jid}: {e}")
+        
+        # Check if chat exists
+        stmt = select(Chat).where(Chat.jid == jid)
+        result = await db.execute(stmt)
+        existing_chat = result.scalar_one_or_none()
+        
+        if existing_chat:
+            # Update existing chat
+            existing_chat.name = name
+            if last_message_at:
+                existing_chat.last_message_at = last_message_at
+            existing_chat.chat_metadata = {**existing_chat.chat_metadata, **wa_chat}
+            updated_count += 1
+        else:
+            # Create new chat
+            new_chat = Chat(
+                jid=jid,
+                name=name,
+                chat_type=chat_type,
+                chat_metadata=wa_chat,
+                last_message_at=last_message_at
+            )
+            db.add(new_chat)
+            created_count += 1
+    
+    await db.flush()
+    
+    logger.info(f"Imported selected chats: {created_count} created, {updated_count} updated")
+    
+    return {
+        "message": "Selected chats imported successfully",
+        "created": created_count,
+        "updated": updated_count,
+        "total": created_count + updated_count
+    }
+
+
+@router.delete("/bulk-delete-unassigned")
+async def bulk_delete_unassigned_chats(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Delete all chats that have no bot assignments"""
+    # Find all chats without bot assignments
+    stmt = (
+        select(Chat.id)
+        .outerjoin(ChatBot, Chat.id == ChatBot.chat_id)
+        .group_by(Chat.id)
+        .having(func.count(ChatBot.id) == 0)
+    )
+    result = await db.execute(stmt)
+    chat_ids_to_delete = result.scalars().all()
+    
+    if not chat_ids_to_delete:
+        return {
+            "message": "No unassigned chats to delete",
+            "deleted": 0
+        }
+    
+    # Delete the chats
+    delete_stmt = select(Chat).where(Chat.id.in_(chat_ids_to_delete))
+    delete_result = await db.execute(delete_stmt)
+    chats_to_delete = delete_result.scalars().all()
+    
+    for chat in chats_to_delete:
+        await db.delete(chat)
+    
+    await db.flush()
+    
+    deleted_count = len(chats_to_delete)
+    logger.info(f"Bulk deleted {deleted_count} unassigned chats")
+    
+    return {
+        "message": f"Successfully deleted {deleted_count} unassigned chat(s)",
+        "deleted": deleted_count
+    }
+
+
 # Bot assignment endpoints
 
 @router.get("/{chat_id}/bots", response_model=List[ChatBotAssignmentResponse])
 async def list_chat_bots(
     chat_id: str,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """List all bots assigned to a chat"""
     # Verify chat exists
@@ -295,7 +518,8 @@ async def assign_bot_to_chat(
     chat_id: str,
     assignment_data: ChatBotAssignmentCreate,
     db: AsyncSession = Depends(get_db),
-    bot_manager: Annotated[BotManager, Depends(get_bot_manager_dependency)] = None
+    bot_manager: Annotated[BotManager, Depends(get_bot_manager_dependency)] = None,
+    current_user: User = Depends(get_current_user)
 ):
     """Assign a bot to a chat"""
     # Verify chat exists
@@ -360,7 +584,8 @@ async def update_chat_bot_assignment(
     chat_id: str,
     bot_id: str,
     assignment_data: ChatBotAssignmentUpdate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """Update a bot assignment for a chat"""
     stmt = select(ChatBot).where(
@@ -397,7 +622,8 @@ async def remove_bot_from_chat(
     chat_id: str,
     bot_id: str,
     db: AsyncSession = Depends(get_db),
-    bot_manager: Annotated[BotManager, Depends(get_bot_manager_dependency)] = None
+    bot_manager: Annotated[BotManager, Depends(get_bot_manager_dependency)] = None,
+    current_user: User = Depends(get_current_user)
 ):
     """Remove a bot from a chat"""
     # Get chat

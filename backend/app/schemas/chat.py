@@ -39,6 +39,7 @@ class ChatResponse(ChatBase):
     created_at: datetime
     updated_at: datetime
     last_message_at: Optional[datetime] = None
+    bot_count: Optional[int] = None
     
     model_config = {"from_attributes": True}
 
@@ -75,4 +76,23 @@ class ChatBotAssignmentResponse(BaseModel):
     created_at: datetime
     
     model_config = {"from_attributes": True}
+
+
+class WhatsAppChatPreview(BaseModel):
+    """Schema for WhatsApp chat preview (before import)"""
+    jid: str
+    name: str
+    chat_type: str
+    last_message_time: Optional[str] = None
+    exists: bool = False
+
+
+class WhatsAppChatPreviewResponse(BaseModel):
+    """Schema for WhatsApp chat preview list response"""
+    chats: list[WhatsAppChatPreview]
+
+
+class ImportSelectedChatsRequest(BaseModel):
+    """Schema for selective chat import request"""
+    jids: list[str] = Field(..., min_length=1)
 

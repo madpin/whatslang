@@ -17,6 +17,9 @@ from .chat import (
     ChatBotAssignmentCreate,
     ChatBotAssignmentUpdate,
     ChatBotAssignmentResponse,
+    WhatsAppChatPreview,
+    WhatsAppChatPreviewResponse,
+    ImportSelectedChatsRequest,
 )
 from .message import (
     Message,
@@ -33,6 +36,14 @@ from .schedule import (
     ScheduleResponse,
     ScheduleListResponse,
     ScheduleRunResponse,
+)
+from .user import (
+    UserBase,
+    UserCreate,
+    UserLogin,
+    UserResponse,
+    Token,
+    TokenData,
 )
 
 __all__ = [
@@ -52,6 +63,9 @@ __all__ = [
     "ChatBotAssignmentCreate",
     "ChatBotAssignmentUpdate",
     "ChatBotAssignmentResponse",
+    "WhatsAppChatPreview",
+    "WhatsAppChatPreviewResponse",
+    "ImportSelectedChatsRequest",
     # Message schemas
     "Message",
     "Response",
@@ -66,4 +80,11 @@ __all__ = [
     "ScheduleResponse",
     "ScheduleListResponse",
     "ScheduleRunResponse",
+    # User schemas
+    "UserBase",
+    "UserCreate",
+    "UserLogin",
+    "UserResponse",
+    "Token",
+    "TokenData",
 ]

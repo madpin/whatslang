@@ -1,9 +1,10 @@
 import axios from 'axios'
 import type { Bot, BotCreate, BotUpdate, BotListResponse, BotTypeInfo } from '@/types/bot'
-import type { Chat, ChatCreate, ChatUpdate, ChatListResponse, ChatBotAssignment, ChatBotAssignmentCreate, ChatBotAssignmentUpdate } from '@/types/chat'
+import type { Chat, ChatCreate, ChatUpdate, ChatListResponse, ChatBotAssignment, ChatBotAssignmentCreate, ChatBotAssignmentUpdate, WhatsAppChatPreview } from '@/types/chat'
 import type { Schedule, ScheduleCreate, ScheduleUpdate, ScheduleListResponse, ScheduleRunResponse } from '@/types/schedule'
 import type { MessageListResponse, SendMessageRequest, SendMessageResponse } from '@/types/message'
 import type { HealthResponse } from '@/types/common'
+import type { User, LoginRequest, RegisterRequest, AuthResponse } from '@/types/user'
 
 // In production (Docker), API is proxied through Nginx at the same origin
 // In development, use VITE_API_BASE_URL or default to localhost:8000
@@ -15,6 +16,56 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 })
+
+// Request interceptor to add JWT token
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('auth_token')
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+    return config
+  },
+  (error) => {
+    return Promise.reject(error)
+  }
+)
+
+// Response interceptor to handle 401 errors
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Token is invalid or expired
+      localStorage.removeItem('auth_token')
+      // Redirect to login page
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login'
+      }
+    }
+    return Promise.reject(error)
+  }
+)
+
+// Authentication
+export const login = async (credentials: LoginRequest): Promise<AuthResponse> => {
+  const { data } = await api.post('/api/auth/login', credentials)
+  return data
+}
+
+export const register = async (userData: RegisterRequest): Promise<User> => {
+  const { data } = await api.post('/api/auth/register', userData)
+  return data
+}
+
+export const getCurrentUser = async (): Promise<User> => {
+  const { data } = await api.get('/api/auth/me')
+  return data
+}
+
+export const logout = async (): Promise<void> => {
+  await api.post('/api/auth/logout')
+}
 
 // Health
 export const getHealth = async (): Promise<HealthResponse> => {
@@ -80,6 +131,25 @@ export const syncChat = async (id: string): Promise<Chat> => {
 
 export const syncAllChats = async (): Promise<{ message: string; created: number; updated: number; total: number }> => {
   const { data } = await api.post('/api/chats/sync-all')
+  return data
+}
+
+export const previewWhatsAppChats = async (): Promise<WhatsAppChatPreview[]> => {
+  const { data } = await api.get('/api/chats/preview')
+  return data.chats
+}
+
+export const importSelectedChats = async (jids: string[]): Promise<{ message: string; created: number; updated: number; total: number }> => {
+  const { data } = await api.post('/api/chats/import-selected', { jids })
+  return data
+}
+
+export const deleteChat = async (id: string): Promise<void> => {
+  await api.delete(`/api/chats/${id}`)
+}
+
+export const bulkDeleteUnassignedChats = async (): Promise<{ message: string; deleted: number }> => {
+  const { data } = await api.delete('/api/chats/bulk-delete-unassigned')
   return data
 }
 

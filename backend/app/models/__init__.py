@@ -6,6 +6,7 @@ from .chat import Chat, ChatType
 from .chat_bot import ChatBot
 from .message import ProcessedMessage
 from .schedule import ScheduledMessage, ScheduleType
+from .user import User
 
 __all__ = [
     "Base",
@@ -16,4 +17,5 @@ __all__ = [
     "ProcessedMessage",
     "ScheduledMessage",
     "ScheduleType",
+    "User",
 ]

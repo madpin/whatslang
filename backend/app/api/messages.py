@@ -7,13 +7,14 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models import ProcessedMessage, Chat
+from app.models import ProcessedMessage, Chat, User
 from app.schemas.message import (
     MessageSendRequest,
     MessageSendResponse,
     ProcessedMessageResponse,
     ProcessedMessageListResponse,
 )
+from app.core import get_current_user
 from app.services import WhatsAppClient
 
 logger = logging.getLogger(__name__)
@@ -33,7 +34,8 @@ async def list_messages(
     limit: int = 100,
     chat_id: str = None,
     bot_id: str = None,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """List processed messages"""
     # Build query
@@ -72,7 +74,8 @@ async def list_messages(
 @router.post("/send", response_model=MessageSendResponse)
 async def send_message(
     message_data: MessageSendRequest,
-    whatsapp: Annotated[WhatsAppClient, Depends(get_whatsapp_client_dependency)] = None
+    whatsapp: Annotated[WhatsAppClient, Depends(get_whatsapp_client_dependency)] = None,
+    current_user: User = Depends(get_current_user)
 ):
     """Send a message immediately"""
     try:

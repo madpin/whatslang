@@ -9,7 +9,7 @@ from app.config import settings
 from app.database import init_db, close_db
 from app.services import LLMService, WhatsAppClient
 from app.core import BotManager, MessageProcessor, MessageScheduler
-from app.api import bots, chats, schedules, messages
+from app.api import bots, chats, schedules, messages, auth
 
 # Configure logging
 logging.basicConfig(
@@ -146,6 +146,7 @@ app.dependency_overrides[schedules_get_scheduler] = get_message_scheduler
 
 
 # Include routers
+app.include_router(auth.router)
 app.include_router(bots.router)
 app.include_router(chats.router)
 app.include_router(schedules.router)

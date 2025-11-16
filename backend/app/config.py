@@ -49,6 +49,24 @@ class Settings(BaseSettings):
     port: int = 8000
     reload: bool = False
     
+    # Authentication / JWT
+    jwt_secret_key: str = Field(
+        default="change-this-secret-key-in-production",
+        validation_alias=AliasChoices("jwt_secret_key", "JWT_SECRET_KEY", "secret_key", "SECRET_KEY"),
+    )
+    jwt_algorithm: str = "HS256"
+    access_token_expire_days: int = 7
+    
+    # Default admin user (created on first migration)
+    default_admin_email: str = Field(
+        default="admin@example.com",
+        validation_alias=AliasChoices("default_admin_email", "DEFAULT_ADMIN_EMAIL", "admin_email", "ADMIN_EMAIL"),
+    )
+    default_admin_password: str = Field(
+        default="admin123",
+        validation_alias=AliasChoices("default_admin_password", "DEFAULT_ADMIN_PASSWORD", "admin_password", "ADMIN_PASSWORD"),
+    )
+    
     # CORS
     cors_origins_raw: Optional[str] = Field(
         default=None,

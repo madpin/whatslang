@@ -6,6 +6,10 @@ import {
   updateChat,
   syncChat,
   syncAllChats,
+  previewWhatsAppChats,
+  importSelectedChats,
+  deleteChat,
+  bulkDeleteUnassignedChats,
   getChatBots,
   assignBotToChat,
   updateChatBotAssignment,
@@ -17,6 +21,7 @@ import type {
   ChatBotAssignmentCreate,
   ChatBotAssignmentUpdate,
   ChatBotAssignment,
+  WhatsAppChatPreview,
 } from '@/types/chat'
 import { toast } from 'sonner'
 
@@ -94,6 +99,60 @@ export const useSyncAllChats = () => {
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.detail || 'Failed to sync chats from WhatsApp')
+    },
+  })
+}
+
+export const usePreviewChats = () => {
+  return useQuery<WhatsAppChatPreview[]>({
+    queryKey: ['chats', 'preview'],
+    queryFn: () => previewWhatsAppChats(),
+    enabled: false, // Only fetch when explicitly requested
+    staleTime: 0, // Always fetch fresh data
+  })
+}
+
+export const useImportSelectedChats = () => {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (jids: string[]) => importSelectedChats(jids),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['chats'] })
+      toast.success(`Imported ${data.total} chats (${data.created} new, ${data.updated} updated)`)
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.detail || 'Failed to import selected chats')
+    },
+  })
+}
+
+export const useDeleteChat = () => {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (id: string) => deleteChat(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['chats'] })
+      toast.success('Chat deleted successfully')
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.detail || 'Failed to delete chat')
+    },
+  })
+}
+
+export const useBulkDeleteUnassignedChats = () => {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: () => bulkDeleteUnassignedChats(),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['chats'] })
+      toast.success(data.message)
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.detail || 'Failed to delete unassigned chats')
     },
   })
 }

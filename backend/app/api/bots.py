@@ -7,7 +7,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models import Bot
+from app.models import Bot, User
 from app.schemas.bot import (
     BotCreate,
     BotUpdate,
@@ -15,7 +15,7 @@ from app.schemas.bot import (
     BotListResponse,
     BotTypeInfo,
 )
-from app.core import BotManager
+from app.core import BotManager, get_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,8 @@ def get_bot_manager_dependency() -> BotManager:
 
 @router.get("/types", response_model=List[BotTypeInfo])
 async def list_bot_types(
-    bot_manager: Annotated[BotManager, Depends(get_bot_manager_dependency)]
+    bot_manager: Annotated[BotManager, Depends(get_bot_manager_dependency)],
+    current_user: User = Depends(get_current_user)
 ):
     """List all available bot types with their configuration schemas"""
     available_types = bot_manager.get_available_bot_types()
@@ -45,7 +46,8 @@ async def list_bot_types(
 async def list_bots(
     skip: int = 0,
     limit: int = 100,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """List all bot instances"""
     # Get total count
@@ -73,7 +75,8 @@ async def list_bots(
 async def create_bot(
     bot_data: BotCreate,
     db: AsyncSession = Depends(get_db),
-    bot_manager: Annotated[BotManager, Depends(get_bot_manager_dependency)] = None
+    bot_manager: Annotated[BotManager, Depends(get_bot_manager_dependency)] = None,
+    current_user: User = Depends(get_current_user)
 ):
     """Create a new bot instance"""
     # Validate bot type
@@ -104,7 +107,8 @@ async def create_bot(
 @router.get("/{bot_id}", response_model=BotResponse)
 async def get_bot(
     bot_id: str,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """Get a bot by ID"""
     stmt = select(Bot).where(Bot.id == bot_id)
@@ -124,7 +128,8 @@ async def get_bot(
 async def update_bot(
     bot_id: str,
     bot_data: BotUpdate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """Update a bot"""
     stmt = select(Bot).where(Bot.id == bot_id)
@@ -158,7 +163,8 @@ async def update_bot(
 @router.delete("/{bot_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_bot(
     bot_id: str,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """Delete a bot"""
     stmt = select(Bot).where(Bot.id == bot_id)

@@ -9,6 +9,7 @@ export interface Chat {
   created_at: string
   updated_at: string
   last_message_at?: string
+  bot_count?: number
 }
 
 export interface ChatCreate {
@@ -50,5 +51,13 @@ export interface ChatBotAssignmentUpdate {
   config_override?: Record<string, unknown>
   enabled?: boolean
   priority?: number
+}
+
+export interface WhatsAppChatPreview {
+  jid: string
+  name: string
+  chat_type: string
+  last_message_time?: string
+  exists: boolean
 }
 

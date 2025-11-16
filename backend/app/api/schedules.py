@@ -7,7 +7,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models import ScheduledMessage, Chat, ScheduleType as ScheduleTypeModel
+from app.models import ScheduledMessage, Chat, ScheduleType as ScheduleTypeModel, User
 from app.schemas.schedule import (
     ScheduleCreate,
     ScheduleUpdate,
@@ -15,7 +15,7 @@ from app.schemas.schedule import (
     ScheduleListResponse,
     ScheduleRunResponse,
 )
-from app.core import MessageScheduler
+from app.core import MessageScheduler, get_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,8 @@ def get_message_scheduler_dependency() -> MessageScheduler:
 async def list_schedules(
     skip: int = 0,
     limit: int = 100,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """List all scheduled messages"""
     # Get total count
@@ -60,7 +61,8 @@ async def list_schedules(
 async def create_schedule(
     schedule_data: ScheduleCreate,
     db: AsyncSession = Depends(get_db),
-    scheduler: Annotated[MessageScheduler, Depends(get_message_scheduler_dependency)] = None
+    scheduler: Annotated[MessageScheduler, Depends(get_message_scheduler_dependency)] = None,
+    current_user: User = Depends(get_current_user)
 ):
     """Create a new scheduled message"""
     # Verify chat exists
@@ -108,7 +110,8 @@ async def create_schedule(
 @router.get("/{schedule_id}", response_model=ScheduleResponse)
 async def get_schedule(
     schedule_id: str,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """Get a schedule by ID"""
     stmt = select(ScheduledMessage).where(ScheduledMessage.id == schedule_id)
@@ -129,7 +132,8 @@ async def update_schedule(
     schedule_id: str,
     schedule_data: ScheduleUpdate,
     db: AsyncSession = Depends(get_db),
-    scheduler: Annotated[MessageScheduler, Depends(get_message_scheduler_dependency)] = None
+    scheduler: Annotated[MessageScheduler, Depends(get_message_scheduler_dependency)] = None,
+    current_user: User = Depends(get_current_user)
 ):
     """Update a schedule"""
     stmt = select(ScheduledMessage).where(ScheduledMessage.id == schedule_id)
@@ -171,7 +175,8 @@ async def update_schedule(
 async def delete_schedule(
     schedule_id: str,
     db: AsyncSession = Depends(get_db),
-    scheduler: Annotated[MessageScheduler, Depends(get_message_scheduler_dependency)] = None
+    scheduler: Annotated[MessageScheduler, Depends(get_message_scheduler_dependency)] = None,
+    current_user: User = Depends(get_current_user)
 ):
     """Delete a schedule"""
     stmt = select(ScheduledMessage).where(ScheduledMessage.id == schedule_id)
@@ -198,7 +203,8 @@ async def delete_schedule(
 async def run_schedule(
     schedule_id: str,
     db: AsyncSession = Depends(get_db),
-    scheduler: Annotated[MessageScheduler, Depends(get_message_scheduler_dependency)] = None
+    scheduler: Annotated[MessageScheduler, Depends(get_message_scheduler_dependency)] = None,
+    current_user: User = Depends(get_current_user)
 ):
     """Manually trigger a schedule to run immediately"""
     stmt = select(ScheduledMessage).where(ScheduledMessage.id == schedule_id)

@@ -1,16 +1,16 @@
 #!/bin/bash
 set -e
 
-echo "🔄 Running database migrations..."
+echo "🚀 Starting WhatSlang Backend..."
+
+echo "📦 Running database migrations..."
 python run_migrations.py
 
-if [ $? -eq 0 ]; then
-    echo "✓ Migrations completed successfully"
-else
-    echo "✗ Migration failed! Exiting..."
-    exit 1
-fi
+echo "👤 Initializing default admin user (if needed)..."
+python init_default_user.py
 
-echo "🚀 Starting application..."
+echo "✅ Migrations and initialization complete!"
+echo "🌐 Starting FastAPI application..."
+
+# Start the application
 exec uvicorn app.main:app --host 0.0.0.0 --port 8000
-
