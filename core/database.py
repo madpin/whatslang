@@ -73,6 +73,7 @@ class MessageDatabase:
                 bot_name TEXT NOT NULL,
                 chat_jid TEXT NOT NULL,
                 running INTEGER DEFAULT 0,
+                answer_owner_messages INTEGER DEFAULT 1,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (chat_jid) REFERENCES chats(chat_jid) ON DELETE CASCADE,
                 UNIQUE(bot_name, chat_jid)
@@ -88,6 +89,13 @@ class MessageDatabase:
         except sqlite3.OperationalError:
             # Column doesn't exist or already renamed, continue
             pass
+        
+        # Add answer_owner_messages column if it doesn't exist (for existing databases)
+        try:
+            cursor.execute("ALTER TABLE bot_chat_assignments ADD COLUMN answer_owner_messages INTEGER DEFAULT 1")
+            logger.info("Added 'answer_owner_messages' column to bot_chat_assignments table")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
         
         conn.commit()
         conn.close()
@@ -391,6 +399,46 @@ class MessageDatabase:
         except Exception as e:
             logger.error(f"Error setting bot running state: {e}", exc_info=True)
             return False
+    
+    def set_bot_answer_owner_messages(
+        self,
+        bot_name: str,
+        chat_jid: str,
+        answer_owner_messages: bool = True
+    ) -> bool:
+        """Set whether the bot should answer owner messages for a specific chat."""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            # Try to update existing assignment
+            cursor.execute("""
+                UPDATE bot_chat_assignments 
+                SET answer_owner_messages = ?
+                WHERE bot_name = ? AND chat_jid = ?
+            """, (1 if answer_owner_messages else 0, bot_name, chat_jid))
+            
+            # If no rows updated, insert new assignment
+            if cursor.rowcount == 0:
+                cursor.execute("""
+                    INSERT INTO bot_chat_assignments (bot_name, chat_jid, answer_owner_messages)
+                    VALUES (?, ?, ?)
+                """, (bot_name, chat_jid, 1 if answer_owner_messages else 0))
+            
+            conn.commit()
+            conn.close()
+            logger.info(f"Set bot answer_owner_messages: {bot_name} -> {chat_jid} (answer_owner_messages={answer_owner_messages})")
+            return True
+        except Exception as e:
+            logger.error(f"Error setting bot answer_owner_messages: {e}", exc_info=True)
+            return False
+    
+    def get_bot_answer_owner_messages(self, bot_name: str, chat_jid: str) -> bool:
+        """Get whether the bot should answer owner messages for a specific chat. Defaults to True."""
+        assignment = self.get_bot_assignment(bot_name, chat_jid)
+        if assignment is None:
+            return True  # Default to answering owner messages
+        return assignment.get('answer_owner_messages', 1) == 1
     
     def get_bot_assignment(self, bot_name: str, chat_jid: str) -> Optional[Dict[str, Any]]:
         """Get a specific bot-chat assignment."""

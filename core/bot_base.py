@@ -119,6 +119,7 @@ class BotBase(ABC):
         - Skip if message is from a bot (including this bot)
         - Skip if message starts with any [*] prefix (from bots)
         - Skip if no content
+        - Skip if message is from owner and bot is set to not answer owner messages
         
         Bots can override this to customize filtering logic.
         """
@@ -145,6 +146,15 @@ class BotBase(ABC):
         # Skip messages that start with any bot prefix [*]
         if msg_text.startswith("[") and "]" in msg_text[:20]:
             return False
+        
+        # Check if message is from owner and if bot should answer owner messages
+        is_from_me = message.get("is_from_me", False)
+        if is_from_me:
+            # Get the answer_owner_messages setting from database
+            answer_owner_messages = self.db.get_bot_answer_owner_messages(self.NAME, self.chat_jid)
+            if not answer_owner_messages:
+                logger.debug(f"[{self.NAME}] Skipping message from owner (answer_owner_messages=False)")
+                return False
         
         return True
     

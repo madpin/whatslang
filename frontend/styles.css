@@ -2251,6 +2251,20 @@ body {
     color: var(--text-secondary);
 }
 
+.bot-detail-setting {
+    margin-top: var(--spacing-sm);
+    padding: var(--spacing-sm) 0;
+}
+
+.toggle-label {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
 .bot-detail-actions {
     display: flex;
     gap: 0.375rem;

@@ -437,6 +437,46 @@ async def list_bots():
 
 # ===== Chat Management Endpoints =====
 
+@app.get("/stats")
+async def get_stats():
+    """
+    Get global statistics across all chats (not filtered or paginated).
+    
+    Returns:
+    - total_chats: Total number of chats in the database
+    - running_bots: Total number of running bot instances
+    - stopped_bots: Total number of stopped bot instances
+    - available_bot_types: Number of unique bot types available
+    """
+    try:
+        # Get total chat count (no filters)
+        total_chats = database.count_chats()
+        
+        # Get all bot statuses across all chats
+        all_bot_statuses = bot_manager.get_all_bot_statuses()
+        
+        running_bots = 0
+        stopped_bots = 0
+        available_bot_types = set()
+        
+        for bot_status in all_bot_statuses:
+            available_bot_types.add(bot_status.name)
+            if bot_status.status == 'running':
+                running_bots += 1
+            else:
+                stopped_bots += 1
+        
+        return {
+            "total_chats": total_chats,
+            "running_bots": running_bots,
+            "stopped_bots": stopped_bots,
+            "available_bot_types": len(available_bot_types)
+        }
+    except Exception as e:
+        logger.error(f"Error getting stats: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/chats")
 async def list_chats(
     page: int = 1,
@@ -916,6 +956,32 @@ async def get_bot_logs(bot_name: str, chat_jid: str, limit: int = 50):
         return BotLogsResponse(bot_name=bot_name, chat_jid=chat_jid, logs=logs)
     except Exception as e:
         logger.error(f"Error getting bot logs: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/bots/{bot_name}/settings", response_model=SuccessResponse)
+async def update_bot_settings(bot_name: str, chat_jid: str, answer_owner_messages: bool):
+    """
+    Update bot settings for a specific chat.
+    
+    Query parameters:
+    - chat_jid: The chat JID
+    - answer_owner_messages: Whether the bot should answer owner messages
+    """
+    try:
+        # Update the setting in the database
+        success = database.set_bot_answer_owner_messages(bot_name, chat_jid, answer_owner_messages)
+        
+        if not success:
+            raise HTTPException(status_code=400, detail="Failed to update bot settings")
+        
+        return SuccessResponse(
+            message=f"Updated bot settings: answer_owner_messages={answer_owner_messages}"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating bot settings: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

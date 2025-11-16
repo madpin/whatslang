@@ -110,13 +110,17 @@ class BotManager:
         bot_key = (bot_name, chat_jid)
         is_running = bot_key in self.bots and bot_key in self.bot_threads
         
+        # Get answer_owner_messages setting from database
+        answer_owner_messages = self.database.get_bot_answer_owner_messages(bot_name, chat_jid)
+        
         status = {
             "name": bot_name,
             "chat_jid": chat_jid,
             "display_name": bot_class.__name__,
             "status": "running" if is_running else "stopped",
             "prefix": bot_class.PREFIX,
-            "uptime_seconds": None
+            "uptime_seconds": None,
+            "answer_owner_messages": answer_owner_messages
         }
         
         if is_running and bot_key in self.bot_start_times:

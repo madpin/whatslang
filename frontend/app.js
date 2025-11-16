@@ -128,6 +128,7 @@ async function init() {
     window.deleteChat = deleteChat;
     window.toggleTableRowMessages = toggleTableRowMessages;
     window.goToCardsPage = goToCardsPage;
+    window.toggleAnswerOwner = toggleAnswerOwner;
     
     // Check if we should add logout button (if authenticated)
     const authToken = sessionStorage.getItem('auth_token');
@@ -221,13 +222,8 @@ function setupEventListeners() {
             state.cardsCurrentPage = 1;
             saveStateToStorage();
             
-            if (state.viewMode === 'table') {
-                loadChats();
-            } else if (state.currentView === 'bots') {
-                displayBotsView();
-            } else {
-                applyFiltersToCards();
-            }
+            // Always reload from server with filters (both table and cards view)
+            loadChats();
         }, 300);
     });
 
@@ -237,11 +233,7 @@ function setupEventListeners() {
         state.currentPage = 1;
         state.cardsCurrentPage = 1;
         saveStateToStorage();
-        if (state.viewMode === 'table') {
-            loadChats();
-        } else {
-            applyFiltersToCards();
-        }
+        loadChats(); // Always reload from server
     });
 
     document.getElementById('chatTypeFilter')?.addEventListener('change', (e) => {
@@ -249,11 +241,7 @@ function setupEventListeners() {
         state.currentPage = 1;
         state.cardsCurrentPage = 1;
         saveStateToStorage();
-        if (state.viewMode === 'table') {
-            loadChats();
-        } else {
-            applyFiltersToCards();
-        }
+        loadChats(); // Always reload from server
     });
 
     document.getElementById('botStatusFilter')?.addEventListener('change', (e) => {
@@ -261,11 +249,7 @@ function setupEventListeners() {
         state.currentPage = 1;
         state.cardsCurrentPage = 1;
         saveStateToStorage();
-        if (state.viewMode === 'table') {
-            loadChats();
-        } else {
-            applyFiltersToCards();
-        }
+        loadChats(); // Always reload from server
     });
 
     document.getElementById('clearFiltersBtn')?.addEventListener('click', clearFilters);
@@ -389,6 +373,11 @@ function switchView(view) {
         dashboardOverview.style.display = 'none';
         chatsSection.style.display = 'block';
         if (searchInput) searchInput.placeholder = 'Search bots...';
+        // Note: displayBotsView uses state.chats which should contain all data
+        // If filters are active, we need to clear them first to see all bots
+        if (hasActiveFilters()) {
+            console.log('Note: Active filters may affect bots view. Consider clearing filters to see all bots.');
+        }
         displayBotsView();
     }
 
@@ -448,21 +437,23 @@ async function loadChats() {
         // Build query parameters
         const params = new URLSearchParams();
         
+        // Always use server-side filtering and pagination for consistency
         if (state.viewMode === 'table') {
             params.append('page', state.currentPage);
             params.append('per_page', state.perPage);
             params.append('sort', state.sortBy);
             params.append('order', state.sortOrder);
-            
-            if (state.filters.activity) params.append('activity', state.filters.activity);
-            if (state.filters.chatType) params.append('chat_type', state.filters.chatType);
-            if (state.filters.botStatus) params.append('bot_status', state.filters.botStatus);
-            if (state.filters.search) params.append('search', state.filters.search);
         } else {
-            // In cards mode, fetch all chats for client-side filtering/pagination
-            params.append('per_page', 10000); // Fetch all chats
+            // In cards mode, still use server-side filtering but request more results
+            params.append('per_page', 10000); // Fetch all matching chats
             params.append('page', 1);
         }
+        
+        // Apply filters to server-side query (both table and cards view)
+        if (state.filters.activity) params.append('activity', state.filters.activity);
+        if (state.filters.chatType) params.append('chat_type', state.filters.chatType);
+        if (state.filters.botStatus) params.append('bot_status', state.filters.botStatus);
+        if (state.filters.search) params.append('search', state.filters.search);
         
         const response = await authenticatedFetch(`${API_BASE_URL}/chats?${params}`);
         if (!response.ok) {
@@ -499,7 +490,8 @@ async function loadChats() {
             }
         }
         
-        updateDashboardStats();
+        // Update global stats (always fetch fresh stats, not affected by filters)
+        await updateDashboardStats();
         updateFilterInfo();
         hideLoading();
         
@@ -553,12 +545,13 @@ async function loadChatsQuietly() {
         if (chatsChanged) {
             state.chats = chats;
             displayChats(chats);
-            updateDashboardStats();
         } else {
             state.chats = chats;
             updateBotStatuses(chats);
-            updateDashboardStats();
         }
+        
+        // Always update global stats (not affected by pagination or filters)
+        await updateDashboardStats();
     } catch (error) {
         console.debug('Auto-refresh failed:', error);
     }
@@ -568,42 +561,35 @@ async function loadChatsQuietly() {
 // DASHBOARD STATS
 // ===================================
 
-function updateDashboardStats() {
-    // Ensure state.chats is an array
-    if (!Array.isArray(state.chats)) {
-        console.error('state.chats is not an array:', state.chats);
-        state.chats = [];
+async function updateDashboardStats() {
+    try {
+        // Fetch global statistics from the backend (not affected by filters or pagination)
+        const response = await authenticatedFetch(`${API_BASE_URL}/stats`);
+        if (!response.ok) {
+            console.error('Failed to fetch stats:', response.statusText);
+            return;
+        }
+        
+        const stats = await response.json();
+        
+        // Update stats cards with global statistics
+        document.getElementById('totalChats').textContent = stats.total_chats;
+        document.getElementById('runningBots').textContent = stats.running_bots;
+        document.getElementById('stoppedBots').textContent = stats.stopped_bots;
+        document.getElementById('availableBots').textContent = stats.available_bot_types;
+
+        // Update sidebar stats
+        document.getElementById('statsRunning').textContent = stats.running_bots;
+        document.getElementById('statsStopped').textContent = stats.stopped_bots;
+
+        // Update badges
+        document.getElementById('chatsCount').textContent = stats.total_chats;
+        document.getElementById('botsCount').textContent = stats.available_bot_types;
+        
+        console.log('✓ Updated global dashboard statistics:', stats);
+    } catch (error) {
+        console.error('Error updating dashboard stats:', error);
     }
-    
-    const totalChats = state.chats.length;
-    let runningBots = 0;
-    let stoppedBots = 0;
-    const availableBotTypes = new Set();
-
-    state.chats.forEach(chat => {
-        chat.bots?.forEach(bot => {
-            availableBotTypes.add(bot.name);
-            if (bot.status === 'running') {
-                runningBots++;
-            } else {
-                stoppedBots++;
-            }
-        });
-    });
-
-    // Update stats cards
-    document.getElementById('totalChats').textContent = totalChats;
-    document.getElementById('runningBots').textContent = runningBots;
-    document.getElementById('stoppedBots').textContent = stoppedBots;
-    document.getElementById('availableBots').textContent = availableBotTypes.size;
-
-    // Update sidebar stats
-    document.getElementById('statsRunning').textContent = runningBots;
-    document.getElementById('statsStopped').textContent = stoppedBots;
-
-    // Update badges
-    document.getElementById('chatsCount').textContent = totalChats;
-    document.getElementById('botsCount').textContent = availableBotTypes.size;
 }
 
 // ===================================
@@ -626,15 +612,12 @@ function displayChats(chats) {
         chats = [];
     }
     
-    // Apply filters
-    let filteredChats = applyCardFilters(chats);
-    
-    // Apply pagination
+    // Apply client-side pagination only (filters are now server-side)
     const startIdx = (state.cardsCurrentPage - 1) * state.cardsPerPage;
     const endIdx = startIdx + state.cardsPerPage;
-    const paginatedChats = filteredChats.slice(startIdx, endIdx);
+    const paginatedChats = chats.slice(startIdx, endIdx);
 
-    if (filteredChats.length === 0 && (state.searchQuery || hasActiveFilters())) {
+    if (chats.length === 0 && (state.searchQuery || hasActiveFilters())) {
         container.innerHTML = `
             <div class="empty-state glass-card" style="grid-column: 1 / -1;">
                 <div class="empty-icon">🔍</div>
@@ -647,7 +630,7 @@ function displayChats(chats) {
     }
     
     // Render cards pagination
-    renderCardsPagination(filteredChats.length);
+    renderCardsPagination(chats.length);
     
     // Refresh logs for expanded bots
     for (const key of state.expandedLogs) {
@@ -669,76 +652,15 @@ function displayChats(chats) {
     container.style.display = 'grid';
 }
 
-// Apply filters to cards in client-side
-function applyCardFilters(chats) {
-    let filtered = [...chats];
-    
-    // Search filter
-    if (state.searchQuery) {
-        filtered = filtered.filter(chat => 
-            chat.chat_name.toLowerCase().includes(state.searchQuery) ||
-            chat.chat_jid.toLowerCase().includes(state.searchQuery)
-        );
-    }
-    
-    // Activity filter
-    if (state.filters.activity) {
-        const now = new Date();
-        filtered = filtered.filter(chat => {
-            if (!chat.last_message_time) return state.filters.activity === 'idle';
-            
-            const lastMsg = new Date(chat.last_message_time);
-            const diffHours = (now - lastMsg) / (1000 * 60 * 60);
-            
-            if (state.filters.activity === 'active') {
-                return diffHours < 24;
-            } else if (state.filters.activity === 'recent') {
-                return diffHours >= 24 && diffHours < 168;
-            } else if (state.filters.activity === 'idle') {
-                return diffHours >= 168 || !chat.last_message_time;
-            }
-            return true;
-        });
-    }
-    
-    // Chat type filter
-    if (state.filters.chatType) {
-        filtered = filtered.filter(chat => {
-            if (state.filters.chatType === 'group') {
-                return chat.chat_jid.includes('@g.us');
-            } else if (state.filters.chatType === 'individual') {
-                return chat.chat_jid.includes('@s.whatsapp.net');
-            }
-            return true;
-        });
-    }
-    
-    // Bot status filter
-    if (state.filters.botStatus) {
-        filtered = filtered.filter(chat => {
-            const runningBots = chat.bots.filter(b => b.status === 'running');
-            
-            if (state.filters.botStatus === 'running') {
-                return runningBots.length > 0;
-            } else if (state.filters.botStatus === 'none') {
-                return chat.bots.length === 0 || runningBots.length === 0;
-            }
-            return true;
-        });
-    }
-    
-    return filtered;
-}
-
 // Helper to check if there are active filters
 function hasActiveFilters() {
     return state.filters.activity || state.filters.chatType || state.filters.botStatus;
 }
 
-// Apply filters to cards view (called when filters change in cards mode)
+// Apply filters to cards view (reload from server with filters)
 function applyFiltersToCards() {
     state.cardsCurrentPage = 1; // Reset to first page when filters change
-    displayChats(state.chats);
+    loadChats(); // Reload with new filters from server
 }
 
 function createChatCard(chat) {
@@ -829,6 +751,7 @@ function createBotCard(bot, chatJid) {
     const safeJid = makeSafeId(chatJid);
     const safeLogsId = `${bot.name}-${safeJid}`;
     const runningClass = isRunning ? 'running' : '';
+    const answerOwnerChecked = bot.answer_owner_messages !== false ? 'checked' : '';
     
     return `
         <div class="bot-card ${runningClass}" data-bot-name="${bot.name}" data-chat-jid="${chatJid}">
@@ -845,6 +768,15 @@ function createBotCard(bot, chatJid) {
                 <div class="bot-info-row">
                     <span class="bot-info-label">Uptime</span>
                     <span class="bot-info-value">${uptimeText}</span>
+                </div>
+                <div class="bot-info-row">
+                    <span class="bot-info-label">Answer Owner</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" 
+                               ${answerOwnerChecked} 
+                               onchange="toggleAnswerOwner('${bot.name}', '${escapeAttr(chatJid)}', this.checked)">
+                        <span class="toggle-slider"></span>
+                    </label>
                 </div>
             </div>
             
@@ -1112,6 +1044,31 @@ async function stopBot(botName, chatJid) {
     }
 }
 
+async function toggleAnswerOwner(botName, chatJid, answerOwnerMessages) {
+    try {
+        console.log('toggleAnswerOwner called:', { botName, chatJid, answerOwnerMessages });
+        
+        const url = `${API_BASE_URL}/bots/${encodeURIComponent(botName)}/settings?chat_jid=${encodeURIComponent(chatJid)}&answer_owner_messages=${answerOwnerMessages}`;
+        console.log('Updating bot settings with URL:', url);
+        
+        const response = await authenticatedFetch(url, { method: 'POST' });
+        
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
+            throw new Error(error.detail || 'Failed to update bot settings');
+        }
+        
+        const result = await response.json();
+        showToast(result.message || 'Bot settings updated', 'success');
+        
+    } catch (error) {
+        console.error(`Error updating bot settings for ${botName}:`, error);
+        showToast(`Failed to update bot settings: ${error.message}`, 'error');
+        // Reload chats to restore the previous toggle state
+        await loadChats();
+    }
+}
+
 async function toggleLogs(botName, chatJid) {
     const logsKey = `${botName}::${chatJid}`;
     const safeJid = makeSafeId(chatJid);
@@ -1332,7 +1289,7 @@ function displayBotsView() {
         });
     });
     
-    // Filter by search query if present
+    // Filter by search query if present (client-side for bots view only)
     const filteredBots = state.searchQuery 
         ? allBots.filter(bot => 
             bot.display_name.toLowerCase().includes(state.searchQuery) ||
@@ -1376,6 +1333,7 @@ function createBotCardWithChat(bot) {
     const safeJid = makeSafeId(bot.chatJid);
     const safeLogsId = `${bot.name}-${safeJid}`;
     const runningClass = isRunning ? 'running' : '';
+    const answerOwnerChecked = bot.answer_owner_messages !== false ? 'checked' : '';
 
     return `
         <div class="bot-card-standalone ${runningClass}" data-bot-name="${bot.name}" data-chat-jid="${bot.chatJid}">
@@ -1397,6 +1355,15 @@ function createBotCardWithChat(bot) {
                 <div class="bot-info-row">
                     <span class="bot-info-label">Uptime</span>
                     <span class="bot-info-value">${uptimeText}</span>
+                </div>
+                <div class="bot-info-row">
+                    <span class="bot-info-label">Answer Owner</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" 
+                               ${answerOwnerChecked} 
+                               onchange="toggleAnswerOwner('${bot.name}', '${escapeAttr(bot.chatJid)}', this.checked)">
+                        <span class="toggle-slider"></span>
+                    </label>
                 </div>
             </div>
             
@@ -1681,6 +1648,7 @@ function createExpandedRow(chat) {
         const logsKey = `${bot.name}::${chat.chat_jid}`;
         const logsVisible = state.expandedLogs.has(logsKey);
         const safeLogsId = `${bot.name}-${safeJid}`;
+        const answerOwnerChecked = bot.answer_owner_messages !== false ? 'checked' : '';
         
         return `
             <div class="bot-detail-item">
@@ -1690,6 +1658,17 @@ function createExpandedRow(chat) {
                         Prefix: ${escapeHtml(bot.prefix)} | 
                         Uptime: ${uptimeText} | 
                         ${bot.enabled ? 'Enabled' : 'Disabled'}
+                    </div>
+                    <div class="bot-detail-setting">
+                        <label class="toggle-label">
+                            Answer Owner Messages:
+                            <label class="toggle-switch">
+                                <input type="checkbox" 
+                                       ${answerOwnerChecked} 
+                                       onchange="toggleAnswerOwner('${bot.name}', '${escapeAttr(chat.chat_jid)}', this.checked)">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </label>
                     </div>
                 </div>
                 <div class="bot-detail-actions">
@@ -1984,8 +1963,7 @@ function renderCardsPagination(totalFilteredChats) {
 }
 
 function goToCardsPage(page) {
-    const filteredChats = applyCardFilters(state.chats);
-    const totalPages = Math.ceil(filteredChats.length / state.cardsPerPage);
+    const totalPages = Math.ceil(state.chats.length / state.cardsPerPage);
     
     if (page < 1 || page > totalPages) return;
     

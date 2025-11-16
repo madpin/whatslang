@@ -12,6 +12,7 @@ class BotStatus(BaseModel):
     status: str  # "running" or "stopped"
     prefix: str
     uptime_seconds: Optional[int] = None
+    answer_owner_messages: bool = True  # Whether the bot should answer owner messages
 
 
 class BotLog(BaseModel):
