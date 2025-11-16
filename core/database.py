@@ -1,0 +1,321 @@
+"""Database for tracking processed messages and managing chats/bot assignments."""
+
+import sqlite3
+import logging
+from pathlib import Path
+from typing import Dict, List, Optional, Any
+from datetime import datetime
+
+logger = logging.getLogger(__name__)
+
+
+class MessageDatabase:
+    """Manages SQLite database for tracking processed messages and bot assignments."""
+    
+    def __init__(self, db_path: Path):
+        self.db_path = Path(db_path) if not isinstance(db_path, Path) else db_path
+        # Ensure parent directory exists
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self.init_db()
+    
+    def init_db(self):
+        """Initialize the database schema."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        # Existing table for processed messages
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS processed_messages (
+                message_id TEXT,
+                bot_name TEXT,
+                original_text TEXT,
+                response_text TEXT,
+                metadata TEXT,
+                processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (message_id, bot_name)
+            )
+        """)
+        
+        # New table for chats
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS chats (
+                chat_jid TEXT PRIMARY KEY,
+                chat_name TEXT,
+                is_manual INTEGER DEFAULT 0,
+                last_synced TIMESTAMP,
+                added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # New table for bot-chat assignments
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS bot_chat_assignments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                bot_name TEXT NOT NULL,
+                chat_jid TEXT NOT NULL,
+                enabled INTEGER DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (chat_jid) REFERENCES chats(chat_jid) ON DELETE CASCADE,
+                UNIQUE(bot_name, chat_jid)
+            )
+        """)
+        
+        conn.commit()
+        conn.close()
+        logger.info(f"Database initialized at {self.db_path}")
+    
+    def is_processed(self, message_id: str, bot_name: str) -> bool:
+        """Check if a message has already been processed by a specific bot."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT 1 FROM processed_messages WHERE message_id = ? AND bot_name = ?",
+            (message_id, bot_name)
+        )
+        result = cursor.fetchone()
+        conn.close()
+        return result is not None
+    
+    def mark_processed(
+        self,
+        message_id: str,
+        bot_name: str,
+        original_text: str,
+        response_text: str,
+        metadata: str = ""
+    ):
+        """Mark a message as processed by a specific bot."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO processed_messages 
+            (message_id, bot_name, original_text, response_text, metadata)
+            VALUES (?, ?, ?, ?, ?)
+        """, (message_id, bot_name, original_text, response_text, metadata))
+        conn.commit()
+        conn.close()
+    
+    # ===== Chat Management Methods =====
+    
+    def add_chat(
+        self,
+        chat_jid: str,
+        chat_name: str,
+        is_manual: bool = False
+    ) -> bool:
+        """Add a new chat to the database."""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO chats (chat_jid, chat_name, is_manual, last_synced)
+                VALUES (?, ?, ?, ?)
+            """, (chat_jid, chat_name, 1 if is_manual else 0, datetime.utcnow().isoformat()))
+            conn.commit()
+            conn.close()
+            logger.info(f"Added chat: {chat_jid} ({chat_name})")
+            return True
+        except sqlite3.IntegrityError:
+            logger.warning(f"Chat already exists: {chat_jid}")
+            return False
+        except Exception as e:
+            logger.error(f"Error adding chat: {e}", exc_info=True)
+            return False
+    
+    def get_chat(self, chat_jid: str) -> Optional[Dict[str, Any]]:
+        """Get a specific chat by JID."""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM chats WHERE chat_jid = ?", (chat_jid,))
+        row = cursor.fetchone()
+        conn.close()
+        
+        if row:
+            return dict(row)
+        return None
+    
+    def list_chats(self) -> List[Dict[str, Any]]:
+        """List all chats in the database."""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM chats ORDER BY added_at DESC")
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(row) for row in rows]
+    
+    def update_chat(
+        self,
+        chat_jid: str,
+        chat_name: Optional[str] = None,
+        last_synced: Optional[str] = None
+    ) -> bool:
+        """Update chat information."""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            updates = []
+            params = []
+            
+            if chat_name is not None:
+                updates.append("chat_name = ?")
+                params.append(chat_name)
+            
+            if last_synced is not None:
+                updates.append("last_synced = ?")
+                params.append(last_synced)
+            
+            if not updates:
+                return True
+            
+            params.append(chat_jid)
+            query = f"UPDATE chats SET {', '.join(updates)} WHERE chat_jid = ?"
+            
+            cursor.execute(query, params)
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            logger.error(f"Error updating chat: {e}", exc_info=True)
+            return False
+    
+    def delete_chat(self, chat_jid: str) -> bool:
+        """Delete a chat and its assignments."""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM chats WHERE chat_jid = ?", (chat_jid,))
+            conn.commit()
+            conn.close()
+            logger.info(f"Deleted chat: {chat_jid}")
+            return True
+        except Exception as e:
+            logger.error(f"Error deleting chat: {e}", exc_info=True)
+            return False
+    
+    # ===== Assignment Management Methods =====
+    
+    def set_bot_assignment(
+        self,
+        bot_name: str,
+        chat_jid: str,
+        enabled: bool = True
+    ) -> bool:
+        """Enable or disable a bot for a specific chat."""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            # Try to update existing assignment
+            cursor.execute("""
+                UPDATE bot_chat_assignments 
+                SET enabled = ?
+                WHERE bot_name = ? AND chat_jid = ?
+            """, (1 if enabled else 0, bot_name, chat_jid))
+            
+            # If no rows updated, insert new assignment
+            if cursor.rowcount == 0:
+                cursor.execute("""
+                    INSERT INTO bot_chat_assignments (bot_name, chat_jid, enabled)
+                    VALUES (?, ?, ?)
+                """, (bot_name, chat_jid, 1 if enabled else 0))
+            
+            conn.commit()
+            conn.close()
+            logger.info(f"Set bot assignment: {bot_name} -> {chat_jid} (enabled={enabled})")
+            return True
+        except Exception as e:
+            logger.error(f"Error setting bot assignment: {e}", exc_info=True)
+            return False
+    
+    def get_bot_assignment(self, bot_name: str, chat_jid: str) -> Optional[Dict[str, Any]]:
+        """Get a specific bot-chat assignment."""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT * FROM bot_chat_assignments 
+            WHERE bot_name = ? AND chat_jid = ?
+        """, (bot_name, chat_jid))
+        row = cursor.fetchone()
+        conn.close()
+        
+        if row:
+            return dict(row)
+        return None
+    
+    def is_bot_enabled_for_chat(self, bot_name: str, chat_jid: str) -> bool:
+        """Check if a bot is enabled for a specific chat."""
+        assignment = self.get_bot_assignment(bot_name, chat_jid)
+        return assignment is not None and assignment.get('enabled', 0) == 1
+    
+    def get_enabled_bots_for_chat(self, chat_jid: str) -> List[str]:
+        """Get list of enabled bot names for a specific chat."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT bot_name FROM bot_chat_assignments 
+            WHERE chat_jid = ? AND enabled = 1
+        """, (chat_jid,))
+        rows = cursor.fetchall()
+        conn.close()
+        return [row[0] for row in rows]
+    
+    def get_enabled_chats_for_bot(self, bot_name: str) -> List[str]:
+        """Get list of enabled chat JIDs for a specific bot."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT chat_jid FROM bot_chat_assignments 
+            WHERE bot_name = ? AND enabled = 1
+        """, (bot_name,))
+        rows = cursor.fetchall()
+        conn.close()
+        return [row[0] for row in rows]
+    
+    def list_assignments_for_chat(self, chat_jid: str) -> List[Dict[str, Any]]:
+        """List all bot assignments for a specific chat."""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT * FROM bot_chat_assignments 
+            WHERE chat_jid = ?
+            ORDER BY bot_name
+        """, (chat_jid,))
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(row) for row in rows]
+    
+    def list_assignments_for_bot(self, bot_name: str) -> List[Dict[str, Any]]:
+        """List all chat assignments for a specific bot."""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT * FROM bot_chat_assignments 
+            WHERE bot_name = ?
+            ORDER BY chat_jid
+        """, (bot_name,))
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(row) for row in rows]
+    
+    def delete_assignment(self, bot_name: str, chat_jid: str) -> bool:
+        """Delete a bot-chat assignment."""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("""
+                DELETE FROM bot_chat_assignments 
+                WHERE bot_name = ? AND chat_jid = ?
+            """, (bot_name, chat_jid))
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            logger.error(f"Error deleting assignment: {e}", exc_info=True)
+            return False
+

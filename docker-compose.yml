@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  whatslang:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: whatslang-bot-service
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8000}:8000"
+    environment:
+      - HOST=${HOST:-0.0.0.0}
+      - PORT=${PORT:-8000}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - WHATSAPP_BASE_URL=${WHATSAPP_BASE_URL}
+      - WHATSAPP_API_USER=${WHATSAPP_API_USER}
+      - WHATSAPP_API_PASSWORD=${WHATSAPP_API_PASSWORD}
+      - CHAT_JID=${CHAT_JID}
+      - DEVICE_ID=${DEVICE_ID:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4}
+      - POLL_INTERVAL=${POLL_INTERVAL:-5}
+      - DB_PATH=${DB_PATH:-/data/messages.db}
+    volumes:
+      - whatslang-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - whatslang-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  whatslang-data:
+    driver: local
+
+networks:
+  whatslang-network:
+    driver: bridge

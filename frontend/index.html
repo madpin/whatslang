@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Bot Service - Multi-Chat Manager</title>
+    <link rel="stylesheet" href="styles.css">
+    <meta name="description" content="Manage WhatsApp bots across multiple chats with an intuitive web interface">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🤖 WhatsApp Bot Service</h1>
+            <p class="subtitle">Manage bots across multiple chats</p>
+        </header>
+
+        <div class="toolbar">
+            <button id="syncChatsBtn" class="btn-primary" title="Sync chats from WhatsApp API">
+                🔄 Sync Chats from WhatsApp
+            </button>
+            <div class="add-chat-form">
+                <input 
+                    type="text" 
+                    id="manualChatJid" 
+                    placeholder="Chat JID (e.g., 123456789@g.us)" 
+                    autocomplete="off"
+                />
+                <input 
+                    type="text" 
+                    id="manualChatName" 
+                    placeholder="Chat Name (optional - will auto-fetch from WhatsApp)" 
+                    autocomplete="off"
+                />
+                <button id="addChatBtn" class="btn-secondary" title="Add chat manually - name will be fetched from WhatsApp if not provided">
+                    ➕ Add Chat Manually
+                </button>
+            </div>
+        </div>
+
+        <main>
+            <div id="chats-container" class="chats-list">
+                <!-- Chat sections will be inserted here dynamically -->
+            </div>
+
+            <div id="loading" class="loading">
+                <p>Loading chats and bot status...</p>
+            </div>
+
+            <div id="error" class="error" style="display: none;">
+                <p></p>
+            </div>
+
+            <div id="no-chats" class="no-chats" style="display: none;">
+                <p>No chats configured yet</p>
+                <p>Click "Sync Chats" to discover chats from WhatsApp or add a chat manually using the form above.</p>
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
