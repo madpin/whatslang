@@ -159,6 +159,10 @@ class BotBase(ABC):
         logger.info(f"[{self.NAME}] Processing message: {msg_text[:50]}...")
         
         try:
+            # Update message activity for this chat
+            message_time = message.get("timestamp") or message.get("time")
+            self.db.update_message_activity(self.chat_jid, message_time=message_time)
+            
             # Let the bot process the message
             response_text = self.process_message(message)
             

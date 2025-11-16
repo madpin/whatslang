@@ -140,8 +140,6 @@ class BotManager:
         for bot_name in self.bot_classes.keys():
             status = self.get_bot_status(bot_name, chat_jid)
             if status:
-                # Add enabled status from database
-                status['enabled'] = self.database.is_bot_enabled_for_chat(bot_name, chat_jid)
                 statuses.append(status)
         return statuses
     
@@ -190,6 +188,9 @@ class BotManager:
             self.bot_threads[bot_key] = thread
             self.bot_start_times[bot_key] = time.time()
             
+            # Mark bot as running in database
+            self.database.set_bot_running_state(bot_name, chat_jid, running=True)
+            
             logger.info(f"Started bot: {bot_name} for chat {chat_jid}")
             return True
         
@@ -226,6 +227,9 @@ class BotManager:
             if bot_key in self.bot_start_times:
                 del self.bot_start_times[bot_key]
             
+            # Mark bot as not running in database
+            self.database.set_bot_running_state(bot_name, chat_jid, running=False)
+            
             logger.info(f"Stopped bot: {bot_name} for chat {chat_jid}")
             return True
         
@@ -246,23 +250,23 @@ class BotManager:
         logs.reverse()
         return logs[:limit]
     
-    def start_enabled_bots(self):
-        """Start all bots that are enabled in the database."""
+    def start_running_bots(self):
+        """Start all bots that were marked as running in the database."""
         chats = self.database.list_chats()
         started_count = 0
         
         for chat in chats:
             chat_jid = chat['chat_jid']
-            enabled_bots = self.database.get_enabled_bots_for_chat(chat_jid)
+            running_bots = self.database.get_running_bots_for_chat(chat_jid)
             
-            for bot_name in enabled_bots:
+            for bot_name in running_bots:
                 if bot_name in self.bot_classes:
                     if self.start_bot(bot_name, chat_jid):
                         started_count += 1
                 else:
-                    logger.warning(f"Enabled bot not found: {bot_name}")
+                    logger.warning(f"Running bot not found: {bot_name}")
         
-        logger.info(f"Started {started_count} enabled bot instance(s)")
+        logger.info(f"Started {started_count} bot instance(s) from previous session")
     
     def stop_all(self):
         """Stop all running bots."""

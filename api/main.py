@@ -19,7 +19,7 @@ from fastapi.staticfiles import StaticFiles
 from api.bot_manager import BotManager
 from api.models import (
     BotStatus, BotLogsResponse, ErrorResponse, SuccessResponse,
-    Chat, ChatWithBots, BotAssignment, AssignmentUpdate, AddChatRequest
+    Chat, ChatWithBots, BotAssignment, AddChatRequest
 )
 from core.whatsapp_client import WhatsAppClient
 from core.llm_service import LLMService
@@ -203,8 +203,8 @@ async def lifespan(app: FastAPI):
                 is_manual=True
             )
         
-        # Start enabled bots from database
-        bot_manager.start_enabled_bots()
+        # Start bots that were running in the previous session
+        bot_manager.start_running_bots()
         
         logger.info("✅ Application startup complete")
         
@@ -458,8 +458,7 @@ async def list_chats(
                         "display_name": bot.display_name,
                         "status": bot.status,
                         "prefix": bot.prefix,
-                        "uptime_seconds": bot.uptime_seconds,
-                        "enabled": bot.enabled
+                        "uptime_seconds": bot.uptime_seconds
                     })
             
             result.append({
@@ -706,17 +705,14 @@ async def delete_chat(chat_jid: str):
 async def bulk_action_chats(
     chat_jids: List[str],
     action: str,
-    bot_name: Optional[str] = None,
-    enabled: Optional[bool] = None
+    bot_name: Optional[str] = None
 ):
     """
     Perform bulk operations on multiple chats.
     
     Supported actions:
-    - start_bots: Start all enabled bots for selected chats
+    - start_bots: Start all running bots for selected chats
     - stop_bots: Stop all running bots for selected chats
-    - enable_bot: Enable a specific bot for selected chats (requires bot_name)
-    - disable_bot: Disable a specific bot for selected chats (requires bot_name)
     - delete_chats: Delete selected chats
     """
     try:
@@ -729,11 +725,11 @@ async def bulk_action_chats(
         for chat_jid in chat_jids:
             try:
                 if action == "start_bots":
-                    # Start all enabled bots for this chat
-                    enabled_bots = database.get_enabled_bots_for_chat(chat_jid)
-                    for bot in enabled_bots:
+                    # Start all bots marked as running for this chat
+                    running_bots = database.get_running_bots_for_chat(chat_jid)
+                    for bot in running_bots:
                         bot_manager.start_bot(bot, chat_jid)
-                    results["success"].append({"chat_jid": chat_jid, "message": f"Started {len(enabled_bots)} bot(s)"})
+                    results["success"].append({"chat_jid": chat_jid, "message": f"Started {len(running_bots)} bot(s)"})
                 
                 elif action == "stop_bots":
                     # Stop all running bots for this chat
@@ -744,22 +740,6 @@ async def bulk_action_chats(
                             bot_manager.stop_bot(bot, chat_jid)
                             stopped_count += 1
                     results["success"].append({"chat_jid": chat_jid, "message": f"Stopped {stopped_count} bot(s)"})
-                
-                elif action == "enable_bot":
-                    if not bot_name:
-                        raise ValueError("bot_name is required for enable_bot action")
-                    database.set_bot_assignment(bot_name, chat_jid, enabled=True)
-                    results["success"].append({"chat_jid": chat_jid, "message": f"Enabled bot {bot_name}"})
-                
-                elif action == "disable_bot":
-                    if not bot_name:
-                        raise ValueError("bot_name is required for disable_bot action")
-                    database.set_bot_assignment(bot_name, chat_jid, enabled=False)
-                    # Also stop the bot if it's running
-                    bot_key = (bot_name, chat_jid)
-                    if bot_key in bot_manager.bots:
-                        bot_manager.stop_bot(bot_name, chat_jid)
-                    results["success"].append({"chat_jid": chat_jid, "message": f"Disabled bot {bot_name}"})
                 
                 elif action == "delete_chats":
                     # Stop all bots first
@@ -801,45 +781,17 @@ async def list_bots_for_chat(chat_jid: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.put("/chats/{chat_jid}/bots/{bot_name}", response_model=SuccessResponse)
-async def update_bot_assignment(chat_jid: str, bot_name: str, update: AssignmentUpdate):
-    """Enable or disable a bot for a specific chat."""
-    try:
-        # Check if bot exists
-        if bot_name not in bot_manager.bot_classes:
-            raise HTTPException(status_code=404, detail=f"Bot not found: {bot_name}")
-        
-        # Check if chat exists
-        chat = database.get_chat(chat_jid)
-        if not chat:
-            raise HTTPException(status_code=404, detail=f"Chat not found: {chat_jid}")
-        
-        # Update assignment
-        success = database.set_bot_assignment(bot_name, chat_jid, update.enabled)
-        if not success:
-            raise HTTPException(status_code=400, detail="Failed to update assignment")
-        
-        return SuccessResponse(
-            message=f"Bot {bot_name} {'enabled' if update.enabled else 'disabled'} for chat {chat_jid}"
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error updating bot assignment: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @app.get("/bots/{bot_name}/chats", response_model=List[Chat])
 async def list_chats_for_bot(bot_name: str):
-    """List all chats with enabled status for a specific bot."""
+    """List all chats where the bot is marked as running."""
     try:
         if bot_name not in bot_manager.bot_classes:
             raise HTTPException(status_code=404, detail=f"Bot not found: {bot_name}")
         
-        enabled_chat_jids = database.get_enabled_chats_for_bot(bot_name)
+        running_chat_jids = database.get_running_chats_for_bot(bot_name)
         chats = []
         
-        for chat_jid in enabled_chat_jids:
+        for chat_jid in running_chat_jids:
             chat = database.get_chat(chat_jid)
             if chat:
                 chats.append(Chat(**chat))
@@ -874,6 +826,7 @@ async def get_bot_status_legacy(bot_name: str, chat_jid: str):
 async def start_bot(bot_name: str, chat_jid: str):
     """Start a bot for a specific chat (requires chat_jid query param)."""
     try:
+        # Start the bot (this will also mark it as running in the database)
         success = bot_manager.start_bot(bot_name, chat_jid)
         if not success:
             raise HTTPException(status_code=400, detail=f"Failed to start bot: {bot_name}")
@@ -889,9 +842,11 @@ async def start_bot(bot_name: str, chat_jid: str):
 async def stop_bot(bot_name: str, chat_jid: str):
     """Stop a bot for a specific chat (requires chat_jid query param)."""
     try:
+        # Stop the bot (this will also mark it as not running in the database)
         success = bot_manager.stop_bot(bot_name, chat_jid)
         if not success:
             raise HTTPException(status_code=400, detail=f"Failed to stop bot: {bot_name}")
+        
         return SuccessResponse(message=f"Bot {bot_name} stopped for chat {chat_jid}")
     except HTTPException:
         raise

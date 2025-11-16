@@ -12,7 +12,6 @@ class BotStatus(BaseModel):
     status: str  # "running" or "stopped"
     prefix: str
     uptime_seconds: Optional[int] = None
-    enabled: Optional[bool] = None
 
 
 class BotLog(BaseModel):
@@ -52,12 +51,7 @@ class BotAssignment(BaseModel):
     """Bot-chat assignment."""
     bot_name: str
     chat_jid: str
-    enabled: bool
-
-
-class AssignmentUpdate(BaseModel):
-    """Update bot assignment enabled status."""
-    enabled: bool
+    running: bool
 
 
 class AddChatRequest(BaseModel):

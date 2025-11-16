@@ -72,12 +72,22 @@ class MessageDatabase:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 bot_name TEXT NOT NULL,
                 chat_jid TEXT NOT NULL,
-                enabled INTEGER DEFAULT 1,
+                running INTEGER DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (chat_jid) REFERENCES chats(chat_jid) ON DELETE CASCADE,
                 UNIQUE(bot_name, chat_jid)
             )
         """)
+        
+        # Migration: Rename 'enabled' column to 'running' if it exists
+        try:
+            cursor.execute("SELECT enabled FROM bot_chat_assignments LIMIT 1")
+            # If we get here, 'enabled' column exists, so we need to migrate
+            cursor.execute("ALTER TABLE bot_chat_assignments RENAME COLUMN enabled TO running")
+            logger.info("Migrated 'enabled' column to 'running' in bot_chat_assignments table")
+        except sqlite3.OperationalError:
+            # Column doesn't exist or already renamed, continue
+            pass
         
         conn.commit()
         conn.close()
@@ -349,13 +359,13 @@ class MessageDatabase:
     
     # ===== Assignment Management Methods =====
     
-    def set_bot_assignment(
+    def set_bot_running_state(
         self,
         bot_name: str,
         chat_jid: str,
-        enabled: bool = True
+        running: bool = True
     ) -> bool:
-        """Enable or disable a bot for a specific chat."""
+        """Set the running state of a bot for a specific chat."""
         try:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
@@ -363,23 +373,23 @@ class MessageDatabase:
             # Try to update existing assignment
             cursor.execute("""
                 UPDATE bot_chat_assignments 
-                SET enabled = ?
+                SET running = ?
                 WHERE bot_name = ? AND chat_jid = ?
-            """, (1 if enabled else 0, bot_name, chat_jid))
+            """, (1 if running else 0, bot_name, chat_jid))
             
             # If no rows updated, insert new assignment
             if cursor.rowcount == 0:
                 cursor.execute("""
-                    INSERT INTO bot_chat_assignments (bot_name, chat_jid, enabled)
+                    INSERT INTO bot_chat_assignments (bot_name, chat_jid, running)
                     VALUES (?, ?, ?)
-                """, (bot_name, chat_jid, 1 if enabled else 0))
+                """, (bot_name, chat_jid, 1 if running else 0))
             
             conn.commit()
             conn.close()
-            logger.info(f"Set bot assignment: {bot_name} -> {chat_jid} (enabled={enabled})")
+            logger.info(f"Set bot running state: {bot_name} -> {chat_jid} (running={running})")
             return True
         except Exception as e:
-            logger.error(f"Error setting bot assignment: {e}", exc_info=True)
+            logger.error(f"Error setting bot running state: {e}", exc_info=True)
             return False
     
     def get_bot_assignment(self, bot_name: str, chat_jid: str) -> Optional[Dict[str, Any]]:
@@ -398,30 +408,30 @@ class MessageDatabase:
             return dict(row)
         return None
     
-    def is_bot_enabled_for_chat(self, bot_name: str, chat_jid: str) -> bool:
-        """Check if a bot is enabled for a specific chat."""
+    def is_bot_running_in_db(self, bot_name: str, chat_jid: str) -> bool:
+        """Check if a bot is marked as running in the database for a specific chat."""
         assignment = self.get_bot_assignment(bot_name, chat_jid)
-        return assignment is not None and assignment.get('enabled', 0) == 1
+        return assignment is not None and assignment.get('running', 0) == 1
     
-    def get_enabled_bots_for_chat(self, chat_jid: str) -> List[str]:
-        """Get list of enabled bot names for a specific chat."""
+    def get_running_bots_for_chat(self, chat_jid: str) -> List[str]:
+        """Get list of bot names that are marked as running for a specific chat."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute("""
             SELECT bot_name FROM bot_chat_assignments 
-            WHERE chat_jid = ? AND enabled = 1
+            WHERE chat_jid = ? AND running = 1
         """, (chat_jid,))
         rows = cursor.fetchall()
         conn.close()
         return [row[0] for row in rows]
     
-    def get_enabled_chats_for_bot(self, bot_name: str) -> List[str]:
-        """Get list of enabled chat JIDs for a specific bot."""
+    def get_running_chats_for_bot(self, bot_name: str) -> List[str]:
+        """Get list of chat JIDs where the bot is marked as running."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute("""
             SELECT chat_jid FROM bot_chat_assignments 
-            WHERE bot_name = ? AND enabled = 1
+            WHERE bot_name = ? AND running = 1
         """, (bot_name,))
         rows = cursor.fetchall()
         conn.close()

@@ -94,7 +94,6 @@ async function init() {
     window.startBot = startBot;
     window.stopBot = stopBot;
     window.toggleLogs = toggleLogs;
-    window.toggleBotAssignment = toggleBotAssignment;
     window.toggleChat = toggleChat;
     window.toggleMessages = toggleMessages;
     window.deleteChat = deleteChat;
@@ -542,26 +541,29 @@ function updateDashboardStats() {
     
     const totalChats = state.chats.length;
     let runningBots = 0;
-    let enabledBots = 0;
+    let stoppedBots = 0;
     const availableBotTypes = new Set();
 
     state.chats.forEach(chat => {
         chat.bots?.forEach(bot => {
             availableBotTypes.add(bot.name);
-            if (bot.status === 'running') runningBots++;
-            if (bot.enabled) enabledBots++;
+            if (bot.status === 'running') {
+                runningBots++;
+            } else {
+                stoppedBots++;
+            }
         });
     });
 
     // Update stats cards
     document.getElementById('totalChats').textContent = totalChats;
     document.getElementById('runningBots').textContent = runningBots;
-    document.getElementById('enabledBots').textContent = enabledBots;
+    document.getElementById('stoppedBots').textContent = stoppedBots;
     document.getElementById('availableBots').textContent = availableBotTypes.size;
 
     // Update sidebar stats
     document.getElementById('statsRunning').textContent = runningBots;
-    document.getElementById('statsStopped').textContent = enabledBots - runningBots;
+    document.getElementById('statsStopped').textContent = stoppedBots;
 
     // Update badges
     document.getElementById('chatsCount').textContent = totalChats;
@@ -679,14 +681,11 @@ function applyCardFilters(chats) {
     if (state.filters.botStatus) {
         filtered = filtered.filter(chat => {
             const runningBots = chat.bots.filter(b => b.status === 'running');
-            const enabledBots = chat.bots.filter(b => b.enabled);
             
             if (state.filters.botStatus === 'running') {
                 return runningBots.length > 0;
-            } else if (state.filters.botStatus === 'enabled') {
-                return enabledBots.length > 0;
             } else if (state.filters.botStatus === 'none') {
-                return chat.bots.length === 0 || (runningBots.length === 0 && enabledBots.length === 0);
+                return chat.bots.length === 0 || runningBots.length === 0;
             }
             return true;
         });
@@ -709,8 +708,8 @@ function applyFiltersToCards() {
 function createChatCard(chat) {
     const isExpanded = state.expandedChats.has(chat.chat_jid);
     const expandedClass = isExpanded ? 'expanded' : '';
-    const enabledCount = chat.bots.filter(b => b.enabled).length;
     const runningCount = chat.bots.filter(b => b.status === 'running').length;
+    const stoppedCount = chat.bots.filter(b => b.status !== 'running').length;
     const safeJid = makeSafeId(chat.chat_jid);
     const messagesVisible = state.expandedMessages.has(chat.chat_jid);
 
@@ -743,14 +742,14 @@ function createChatCard(chat) {
                             <span class="chat-stat-label">bots</span>
                         </div>
                         <div class="chat-stat">
-                            <span class="chat-stat-icon">✓</span>
-                            <span class="chat-stat-value">${enabledCount}</span>
-                            <span class="chat-stat-label">enabled</span>
-                </div>
-                        <div class="chat-stat">
                             <span class="chat-stat-icon">▶️</span>
                             <span class="chat-stat-value">${runningCount}</span>
                             <span class="chat-stat-label">running</span>
+                        </div>
+                        <div class="chat-stat">
+                            <span class="chat-stat-icon">⏸</span>
+                            <span class="chat-stat-value">${stoppedCount}</span>
+                            <span class="chat-stat-label">stopped</span>
                         </div>
                     </div>
                 ` : ''}
@@ -788,7 +787,6 @@ function createChatCard(chat) {
 
 function createBotCard(bot, chatJid) {
     const isRunning = bot.status === 'running';
-    const isEnabled = bot.enabled || false;
     const uptimeText = bot.uptime_seconds ? formatUptime(bot.uptime_seconds) : 'N/A';
     const logsKey = `${bot.name}::${chatJid}`;
     const logsVisible = state.expandedLogs.has(logsKey);
@@ -812,16 +810,6 @@ function createBotCard(bot, chatJid) {
                     <span class="bot-info-label">Uptime</span>
                     <span class="bot-info-value">${uptimeText}</span>
                 </div>
-            </div>
-            
-            <div class="bot-toggle">
-                <span class="bot-toggle-label">Enable Bot</span>
-                <label class="toggle-switch">
-                    <input type="checkbox" 
-                           ${isEnabled ? 'checked' : ''} 
-                           onchange="toggleBotAssignment('${bot.name}', '${escapeAttr(chatJid)}', this.checked)">
-                    <span class="toggle-slider"></span>
-                </label>
             </div>
             
             <div class="bot-actions">
@@ -888,12 +876,6 @@ function updateBotStatuses(chats) {
             if (startBtn) startBtn.disabled = isRunning;
             if (stopBtn) stopBtn.disabled = !isRunning;
             if (logsBtn) logsBtn.disabled = !isRunning;
-            
-            // Update toggle
-            const toggle = botCard.querySelector('.toggle-switch input');
-            if (toggle && toggle.checked !== bot.enabled) {
-                toggle.checked = bot.enabled;
-            }
         });
     });
 }
@@ -1045,31 +1027,6 @@ async function deleteChat(chatJid) {
 // ===================================
 // BOT ACTIONS
 // ===================================
-
-async function toggleBotAssignment(botName, chatJid, enabled) {
-    try {
-        const response = await fetch(
-            `${API_BASE_URL}/chats/${encodeURIComponent(chatJid)}/bots/${encodeURIComponent(botName)}`,
-            {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ enabled })
-            }
-        );
-        
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.detail || 'Failed to update assignment');
-        }
-        
-        showToast(`Bot ${enabled ? 'enabled' : 'disabled'}`, 'success');
-        
-    } catch (error) {
-        console.error('Error updating bot assignment:', error);
-        showToast(`Failed to update: ${error.message}`, 'error');
-        await loadChats();
-    }
-}
 
 async function startBot(botName, chatJid) {
     console.log('startBot called:', { botName, chatJid });
@@ -1377,7 +1334,6 @@ function displayBotsView() {
 
 function createBotCardWithChat(bot) {
     const isRunning = bot.status === 'running';
-    const isEnabled = bot.enabled || false;
     const uptimeText = bot.uptime_seconds ? formatUptime(bot.uptime_seconds) : 'N/A';
     const logsKey = `${bot.name}::${bot.chatJid}`;
     const logsVisible = state.expandedLogs.has(logsKey);
@@ -1406,16 +1362,6 @@ function createBotCardWithChat(bot) {
                     <span class="bot-info-label">Uptime</span>
                     <span class="bot-info-value">${uptimeText}</span>
                 </div>
-            </div>
-            
-            <div class="bot-toggle">
-                <span class="bot-toggle-label">Enable Bot</span>
-                <label class="toggle-switch">
-                    <input type="checkbox" 
-                           ${isEnabled ? 'checked' : ''} 
-                           onchange="toggleBotAssignment('${bot.name}', '${escapeAttr(bot.chatJid)}', this.checked)">
-                    <span class="toggle-slider"></span>
-                </label>
             </div>
             
             <div class="bot-actions">
@@ -1590,7 +1536,7 @@ function createTableRow(chat) {
     const isSelected = state.selectedChats.has(chat.chat_jid);
     const isExpanded = state.expandedTableRows.has(chat.chat_jid);
     const runningBots = chat.bots.filter(b => b.status === 'running');
-    const enabledBots = chat.bots.filter(b => b.enabled);
+    const stoppedBots = chat.bots.filter(b => b.status !== 'running');
     
     // Activity status
     let activityBadge = '';
@@ -1617,8 +1563,8 @@ function createTableRow(chat) {
     
     // Bot pills
     const botPills = chat.bots.slice(0, 3).map(bot => {
-        const statusClass = bot.status === 'running' ? 'running' : (bot.enabled ? 'enabled' : '');
-        const icon = bot.status === 'running' ? '▶️' : (bot.enabled ? '✓' : '○');
+        const statusClass = bot.status === 'running' ? 'running' : 'stopped';
+        const icon = bot.status === 'running' ? '▶️' : '⏸';
         return `<span class="bot-pill ${statusClass}"><span class="bot-pill-icon">${icon}</span>${escapeHtml(bot.display_name)}</span>`;
     }).join('');
     
@@ -1627,9 +1573,9 @@ function createTableRow(chat) {
     // Status badge
     let statusBadge = '';
     if (runningBots.length > 0) {
-        statusBadge = `<span class="status-badge has-running">✓ ${runningBots.length} Running</span>`;
-    } else if (enabledBots.length > 0) {
-        statusBadge = `<span class="status-badge has-enabled">○ ${enabledBots.length} Enabled</span>`;
+        statusBadge = `<span class="status-badge has-running">▶️ ${runningBots.length} Running</span>`;
+    } else if (stoppedBots.length > 0) {
+        statusBadge = `<span class="status-badge has-stopped">⏸ ${stoppedBots.length} Stopped</span>`;
     } else {
         statusBadge = `<span class="status-badge no-bots">No Bots</span>`;
     }
