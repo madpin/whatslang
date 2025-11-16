@@ -679,8 +679,17 @@ async function toggleBotAssignment(botName, chatJid, enabled) {
 }
 
 async function startBot(botName, chatJid) {
+    console.log('startBot called:', { botName, chatJid });
+    
     const botCard = document.querySelector(`[data-bot-name="${botName}"][data-chat-jid="${chatJid}"]`);
     const startBtn = botCard?.querySelector('.bot-btn.start');
+    const originalHtml = startBtn?.innerHTML || '▶️';
+    
+    if (!botCard) {
+        console.error('Bot card not found:', { botName, chatJid });
+        showToast('Bot card not found', 'error');
+        return;
+    }
     
     if (startBtn) {
         startBtn.disabled = true;
@@ -688,13 +697,13 @@ async function startBot(botName, chatJid) {
     }
     
     try {
-        const response = await fetch(
-            `${API_BASE_URL}/bots/${encodeURIComponent(botName)}/start?chat_jid=${encodeURIComponent(chatJid)}`,
-            { method: 'POST' }
-        );
+        const url = `${API_BASE_URL}/bots/${encodeURIComponent(botName)}/start?chat_jid=${encodeURIComponent(chatJid)}`;
+        console.log('Starting bot with URL:', url);
+        
+        const response = await fetch(url, { method: 'POST' });
         
         if (!response.ok) {
-            const error = await response.json();
+            const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
             throw new Error(error.detail || 'Failed to start bot');
         }
         
@@ -704,12 +713,19 @@ async function startBot(botName, chatJid) {
     } catch (error) {
         console.error(`Error starting bot ${botName}:`, error);
         showToast(`Failed to start bot: ${error.message}`, 'error');
+        
+        // Reset button state on error
+        if (startBtn) {
+            startBtn.innerHTML = originalHtml;
+            startBtn.disabled = false;
+        }
     }
 }
 
 async function stopBot(botName, chatJid) {
     const botCard = document.querySelector(`[data-bot-name="${botName}"][data-chat-jid="${chatJid}"]`);
     const stopBtn = botCard?.querySelector('.bot-btn.stop');
+    const originalHtml = stopBtn?.innerHTML || '⏹️';
     
     if (stopBtn) {
         stopBtn.disabled = true;
@@ -736,7 +752,13 @@ async function stopBot(botName, chatJid) {
         
     } catch (error) {
         console.error(`Error stopping bot ${botName}:`, error);
-        showToast(`Failed to stop bot: ${error.message}`, 'error');
+        showToast(`Failed to start bot: ${error.message}`, 'error');
+        
+        // Reset button state on error
+        if (stopBtn) {
+            stopBtn.innerHTML = originalHtml;
+            stopBtn.disabled = false;
+        }
     }
 }
 
@@ -892,7 +914,13 @@ function escapeHtml(text) {
 }
 
 function escapeAttr(text) {
-    return text.replace(/'/g, "\\'");
+    // Escape for use in single-quoted JavaScript string within HTML attribute
+    return text
+        .replace(/\\/g, '\\\\')  // Escape backslashes first
+        .replace(/'/g, "\\'")     // Escape single quotes
+        .replace(/"/g, '\\"')     // Escape double quotes
+        .replace(/\n/g, '\\n')    // Escape newlines
+        .replace(/\r/g, '\\r');   // Escape carriage returns
 }
 
 function formatUptime(seconds) {
@@ -1094,6 +1122,38 @@ function startAutoRefresh() {
         await loadChatsQuietly();
     }, REFRESH_INTERVAL);
 }
+
+// ===================================
+// ERROR HANDLING
+// ===================================
+
+// Suppress Chrome extension errors that might interfere
+window.addEventListener('error', (event) => {
+    const message = event.message || '';
+    // These are Chrome extension errors that don't affect functionality
+    if (message.includes('chrome.runtime') || 
+        message.includes('message channel closed') ||
+        message.includes('Extension context invalidated')) {
+        event.preventDefault();
+        event.stopPropagation();
+        console.debug('Suppressed Chrome extension error:', message);
+        return false;
+    }
+});
+
+// Handle unhandled promise rejections
+window.addEventListener('unhandledrejection', (event) => {
+    const message = event.reason?.message || String(event.reason);
+    // Suppress Chrome extension promise rejections
+    if (message.includes('chrome.runtime') || 
+        message.includes('message channel closed') ||
+        message.includes('Extension context invalidated')) {
+        event.preventDefault();
+        console.debug('Suppressed Chrome extension promise rejection:', message);
+        return;
+    }
+    console.error('Unhandled promise rejection:', event.reason);
+});
 
 // ===================================
 // INITIALIZATION
