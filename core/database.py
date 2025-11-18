@@ -74,6 +74,7 @@ class MessageDatabase:
                 chat_jid TEXT NOT NULL,
                 running INTEGER DEFAULT 0,
                 answer_owner_messages INTEGER DEFAULT 1,
+                context_message_count INTEGER DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (chat_jid) REFERENCES chats(chat_jid) ON DELETE CASCADE,
                 UNIQUE(bot_name, chat_jid)
@@ -94,6 +95,13 @@ class MessageDatabase:
         try:
             cursor.execute("ALTER TABLE bot_chat_assignments ADD COLUMN answer_owner_messages INTEGER DEFAULT 1")
             logger.info("Added 'answer_owner_messages' column to bot_chat_assignments table")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+        
+        # Add context_message_count column if it doesn't exist (for existing databases)
+        try:
+            cursor.execute("ALTER TABLE bot_chat_assignments ADD COLUMN context_message_count INTEGER DEFAULT 0")
+            logger.info("Added 'context_message_count' column to bot_chat_assignments table")
         except sqlite3.OperationalError:
             pass  # Column already exists
         
@@ -473,6 +481,46 @@ class MessageDatabase:
         if assignment is None:
             return True  # Default to answering owner messages
         return assignment.get('answer_owner_messages', 1) == 1
+    
+    def set_bot_context_message_count(
+        self,
+        bot_name: str,
+        chat_jid: str,
+        context_message_count: int
+    ) -> bool:
+        """Set the number of context messages to include for a bot in a specific chat."""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            # Try to update existing assignment
+            cursor.execute("""
+                UPDATE bot_chat_assignments 
+                SET context_message_count = ?
+                WHERE bot_name = ? AND chat_jid = ?
+            """, (context_message_count, bot_name, chat_jid))
+            
+            # If no rows updated, insert new assignment
+            if cursor.rowcount == 0:
+                cursor.execute("""
+                    INSERT INTO bot_chat_assignments (bot_name, chat_jid, context_message_count)
+                    VALUES (?, ?, ?)
+                """, (bot_name, chat_jid, context_message_count))
+            
+            conn.commit()
+            conn.close()
+            logger.info(f"Set bot context_message_count: {bot_name} -> {chat_jid} (count={context_message_count})")
+            return True
+        except Exception as e:
+            logger.error(f"Error setting bot context_message_count: {e}", exc_info=True)
+            return False
+    
+    def get_bot_context_message_count(self, bot_name: str, chat_jid: str) -> int:
+        """Get the number of context messages to include for a bot in a specific chat. Defaults to 0."""
+        assignment = self.get_bot_assignment(bot_name, chat_jid)
+        if assignment is None:
+            return 0  # Default to no context
+        return assignment.get('context_message_count', 0)
     
     def get_bot_assignment(self, bot_name: str, chat_jid: str) -> Optional[Dict[str, Any]]:
         """Get a specific bot-chat assignment."""

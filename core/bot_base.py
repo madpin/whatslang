@@ -41,12 +41,13 @@ class BotBase(ABC):
         self.should_exit = False
     
     @abstractmethod
-    def process_message(self, message: Dict[str, Any]) -> Optional[str]:
+    def process_message(self, message: Dict[str, Any], history: Optional[List[Dict[str, Any]]] = None) -> Optional[str]:
         """
         Process a message and return the response text.
         
         Args:
             message: The message dict from WhatsApp API
+            history: Optional list of previous messages for context
         
         Returns:
             The response text to send, or None to skip
@@ -108,6 +109,71 @@ class BotBase(ABC):
             return [f"{prefix} {chunks[0]}"]
         
         return [f"{prefix} {i+1}/{total_chunks} {chunk}" for i, chunk in enumerate(chunks)]
+    
+    def get_message_history(self, current_message_id: str, count: int) -> List[Dict[str, Any]]:
+        """
+        Retrieve message history from WhatsApp for context.
+        
+        Args:
+            current_message_id: The ID of the current message being processed
+            count: Number of previous messages to retrieve
+        
+        Returns:
+            List of formatted history messages, excluding the current message
+        """
+        if count <= 0:
+            return []
+        
+        try:
+            # Fetch more messages than needed to account for filtering
+            fetch_limit = count + 10
+            messages = self.whatsapp.get_messages(self.chat_jid, limit=fetch_limit)
+            
+            if not messages:
+                logger.debug(f"[{self.NAME}] No messages fetched for history")
+                return []
+            
+            # Filter out current message and format history
+            history = []
+            for msg in messages:
+                msg_id = msg.get("id")
+                if msg_id == current_message_id:
+                    continue
+                
+                content = msg.get("content", "")
+                if not content:
+                    continue
+                
+                # Check if message is from a bot (has bot prefix)
+                is_bot = False
+                if content.startswith("[") and "]" in content[:20]:
+                    is_bot = True
+                
+                # Get sender information
+                sender = msg.get("sender", "") or msg.get("from", "")
+                is_from_me = msg.get("is_from_me", False)
+                
+                history.append({
+                    "content": content,
+                    "sender": sender,
+                    "is_from_me": is_from_me,
+                    "is_bot": is_bot,
+                    "timestamp": msg.get("timestamp") or msg.get("time")
+                })
+                
+                # Stop once we have enough history messages
+                if len(history) >= count:
+                    break
+            
+            # Reverse to get chronological order (oldest first)
+            history.reverse()
+            
+            logger.info(f"[{self.NAME}] Retrieved {len(history)} history messages for context")
+            return history
+            
+        except Exception as e:
+            logger.error(f"[{self.NAME}] Error fetching message history: {e}", exc_info=True)
+            return []
     
     def should_process_message(self, message: Dict[str, Any]) -> bool:
         """
@@ -173,8 +239,16 @@ class BotBase(ABC):
             message_time = message.get("timestamp") or message.get("time")
             self.db.update_message_activity(self.chat_jid, message_time=message_time)
             
-            # Let the bot process the message
-            response_text = self.process_message(message)
+            # Check if context is enabled for this bot
+            context_count = self.db.get_bot_context_message_count(self.NAME, self.chat_jid)
+            history = None
+            
+            if context_count > 0:
+                logger.info(f"[{self.NAME}] Fetching {context_count} context messages")
+                history = self.get_message_history(message_id, context_count)
+            
+            # Let the bot process the message with optional history
+            response_text = self.process_message(message, history=history)
             
             if not response_text:
                 logger.info(f"[{self.NAME}] No response generated for message {message_id}")

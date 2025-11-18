@@ -13,6 +13,7 @@ class BotStatus(BaseModel):
     prefix: str
     uptime_seconds: Optional[int] = None
     answer_owner_messages: bool = True  # Whether the bot should answer owner messages
+    context_message_count: int = 0  # Number of previous messages to include as context
 
 
 class BotLog(BaseModel):

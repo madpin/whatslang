@@ -960,28 +960,119 @@ async def get_bot_logs(bot_name: str, chat_jid: str, limit: int = 50):
 
 
 @app.post("/bots/{bot_name}/settings", response_model=SuccessResponse)
-async def update_bot_settings(bot_name: str, chat_jid: str, answer_owner_messages: bool):
+async def update_bot_settings(
+    bot_name: str, 
+    chat_jid: str, 
+    answer_owner_messages: Optional[bool] = None,
+    context_message_count: Optional[int] = None
+):
     """
     Update bot settings for a specific chat.
     
     Query parameters:
     - chat_jid: The chat JID
-    - answer_owner_messages: Whether the bot should answer owner messages
+    - answer_owner_messages: Whether the bot should answer owner messages (optional)
+    - context_message_count: Number of previous messages to include as context (optional)
     """
     try:
-        # Update the setting in the database
-        success = database.set_bot_answer_owner_messages(bot_name, chat_jid, answer_owner_messages)
+        updates = []
         
-        if not success:
-            raise HTTPException(status_code=400, detail="Failed to update bot settings")
+        # Update answer_owner_messages if provided
+        if answer_owner_messages is not None:
+            success = database.set_bot_answer_owner_messages(bot_name, chat_jid, answer_owner_messages)
+            if not success:
+                raise HTTPException(status_code=400, detail="Failed to update answer_owner_messages")
+            updates.append(f"answer_owner_messages={answer_owner_messages}")
+        
+        # Update context_message_count if provided
+        if context_message_count is not None:
+            if context_message_count < 0:
+                raise HTTPException(status_code=400, detail="context_message_count must be >= 0")
+            success = database.set_bot_context_message_count(bot_name, chat_jid, context_message_count)
+            if not success:
+                raise HTTPException(status_code=400, detail="Failed to update context_message_count")
+            updates.append(f"context_message_count={context_message_count}")
+        
+        if not updates:
+            raise HTTPException(status_code=400, detail="No settings provided to update")
         
         return SuccessResponse(
-            message=f"Updated bot settings: answer_owner_messages={answer_owner_messages}"
+            message=f"Updated bot settings: {', '.join(updates)}"
         )
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error updating bot settings: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.put("/bots/{bot_name}/chats/{chat_jid}/context", response_model=SuccessResponse)
+async def set_bot_context(bot_name: str, chat_jid: str, count: int):
+    """
+    Set the number of context messages for a bot in a specific chat.
+    
+    Path parameters:
+    - bot_name: The bot name
+    - chat_jid: The chat JID
+    
+    Query parameters:
+    - count: Number of previous messages to include as context (>= 0)
+    """
+    try:
+        if count < 0:
+            raise HTTPException(status_code=400, detail="count must be >= 0")
+        
+        # Verify bot exists
+        if bot_name not in bot_manager.bot_classes:
+            raise HTTPException(status_code=404, detail=f"Bot not found: {bot_name}")
+        
+        # Verify chat exists
+        chat = database.get_chat(chat_jid)
+        if not chat:
+            raise HTTPException(status_code=404, detail=f"Chat not found: {chat_jid}")
+        
+        # Update context message count
+        success = database.set_bot_context_message_count(bot_name, chat_jid, count)
+        
+        if not success:
+            raise HTTPException(status_code=400, detail="Failed to update context message count")
+        
+        return SuccessResponse(
+            message=f"Set context message count to {count} for {bot_name} in chat {chat_jid}"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error setting bot context: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/bots/{bot_name}/chats/{chat_jid}/context")
+async def get_bot_context(bot_name: str, chat_jid: str):
+    """
+    Get the number of context messages for a bot in a specific chat.
+    
+    Path parameters:
+    - bot_name: The bot name
+    - chat_jid: The chat JID
+    """
+    try:
+        # Verify bot exists
+        if bot_name not in bot_manager.bot_classes:
+            raise HTTPException(status_code=404, detail=f"Bot not found: {bot_name}")
+        
+        # Get context message count
+        count = database.get_bot_context_message_count(bot_name, chat_jid)
+        
+        return {
+            "bot_name": bot_name,
+            "chat_jid": chat_jid,
+            "context_message_count": count
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting bot context: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

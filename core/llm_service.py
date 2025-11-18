@@ -47,6 +47,74 @@ class LLMService:
             logger.error(f"LLM call error: {e}")
             return None
     
+    def call_with_history(
+        self,
+        system_prompt: str,
+        current_message: str,
+        history: List[Dict[str, Any]]
+    ) -> Optional[str]:
+        """
+        Make an LLM call with conversation history context.
+        
+        Args:
+            system_prompt: The system/instruction prompt
+            current_message: The current message to process
+            history: List of previous messages with format:
+                     [{"sender": str, "content": str, "is_from_me": bool, "is_bot": bool}, ...]
+        
+        Returns:
+            The LLM response text, or None if the call fails
+        """
+        try:
+            # Build messages array for OpenAI API
+            messages = [{"role": "system", "content": system_prompt}]
+            
+            # Add history messages
+            for msg in history:
+                content = msg.get("content", "")
+                if not content:
+                    continue
+                
+                # Determine role based on message type
+                # Bot messages and owner messages are "assistant"
+                # Other user messages are "user"
+                is_bot = msg.get("is_bot", False)
+                is_from_me = msg.get("is_from_me", False)
+                
+                if is_bot or is_from_me:
+                    role = "assistant"
+                else:
+                    role = "user"
+                
+                sender = msg.get("sender", "Unknown")
+                # Format with sender info for context
+                formatted_content = f"[{sender}]: {content}"
+                
+                messages.append({
+                    "role": role,
+                    "content": formatted_content
+                })
+            
+            # Add current message as user message
+            messages.append({
+                "role": "user",
+                "content": current_message
+            })
+            
+            logger.debug(f"Calling LLM with {len(history)} history messages")
+            
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages
+            )
+            
+            result = response.choices[0].message.content
+            return result.strip() if result else None
+        
+        except Exception as e:
+            logger.error(f"LLM call with history error: {e}")
+            return None
+    
     def call_with_image(self, prompt: str, image_bytes: bytes) -> Optional[str]:
         """
         Make an LLM call with an image.

@@ -129,6 +129,8 @@ async function init() {
     window.toggleTableRowMessages = toggleTableRowMessages;
     window.goToCardsPage = goToCardsPage;
     window.toggleAnswerOwner = toggleAnswerOwner;
+    window.updateContextCount = updateContextCount;
+    window.adjustContextCount = adjustContextCount;
     
     // Check if we should add logout button (if authenticated)
     const authToken = sessionStorage.getItem('auth_token');
@@ -757,6 +759,8 @@ function createBotCard(bot, chatJid) {
     const safeLogsId = `${bot.name}-${safeJid}`;
     const runningClass = isRunning ? 'running' : '';
     const answerOwnerChecked = bot.answer_owner_messages !== false ? 'checked' : '';
+    const contextCount = bot.context_message_count || 0;
+    const contextHint = contextCount === 0 ? 'Disabled' : `${contextCount} previous message${contextCount !== 1 ? 's' : ''}`;
     
     return `
         <div class="bot-card ${runningClass}" data-bot-name="${bot.name}" data-chat-jid="${chatJid}">
@@ -782,6 +786,23 @@ function createBotCard(bot, chatJid) {
                                onchange="toggleAnswerOwner('${bot.name}', '${escapeAttr(chatJid)}', this.checked)">
                         <span class="toggle-slider"></span>
                     </label>
+                </div>
+                <div class="bot-info-row bot-setting">
+                    <div class="setting-label-with-info">
+                        <span class="bot-info-label">Context Messages</span>
+                        <button class="info-icon" title="Number of previous messages sent as context to the bot.&#10;&#10;• 0 = Disabled (no context)&#10;• 3-10 = Normal (recommended)&#10;• 10+ = Advanced (more context)&#10;&#10;Higher values may increase response time." onclick="event.stopPropagation();">ℹ️</button>
+                    </div>
+                    <div class="number-input-group">
+                        <button class="decrement-btn" onclick="adjustContextCount('${bot.name}', '${escapeAttr(chatJid)}', ${contextCount}, -1)">−</button>
+                        <input type="number" 
+                               class="context-input"
+                               min="0" 
+                               max="50" 
+                               value="${contextCount}"
+                               onchange="updateContextCount('${bot.name}', '${escapeAttr(chatJid)}', parseInt(this.value))">
+                        <button class="increment-btn" onclick="adjustContextCount('${bot.name}', '${escapeAttr(chatJid)}', ${contextCount}, 1)">+</button>
+                    </div>
+                    <div class="setting-hint">${contextHint}</div>
                 </div>
             </div>
             
@@ -1074,6 +1095,70 @@ async function toggleAnswerOwner(botName, chatJid, answerOwnerMessages) {
     }
 }
 
+// Debounce timer for context count updates
+let contextCountDebounceTimers = {};
+
+async function updateContextCount(botName, chatJid, count) {
+    try {
+        // Validate count
+        if (isNaN(count) || count < 0) {
+            showToast('Context count must be a positive number', 'error');
+            await loadChats(); // Reload to restore previous value
+            return;
+        }
+        
+        if (count > 50) {
+            showToast('Context count cannot exceed 50', 'error');
+            await loadChats(); // Reload to restore previous value
+            return;
+        }
+        
+        console.log('updateContextCount called:', { botName, chatJid, count });
+        
+        // Debounce the API call
+        const timerKey = `${botName}::${chatJid}`;
+        if (contextCountDebounceTimers[timerKey]) {
+            clearTimeout(contextCountDebounceTimers[timerKey]);
+        }
+        
+        contextCountDebounceTimers[timerKey] = setTimeout(async () => {
+            try {
+                const url = `${API_BASE_URL}/bots/${encodeURIComponent(botName)}/settings?chat_jid=${encodeURIComponent(chatJid)}&context_message_count=${count}`;
+                console.log('Updating context count with URL:', url);
+                
+                const response = await authenticatedFetch(url, { method: 'POST' });
+                
+                if (!response.ok) {
+                    const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
+                    throw new Error(error.detail || 'Failed to update context count');
+                }
+                
+                const result = await response.json();
+                showToast(result.message || 'Context count updated', 'success');
+                
+                // Reload chats to reflect the change
+                await loadChats();
+                
+            } catch (error) {
+                console.error(`Error updating context count for ${botName}:`, error);
+                showToast(`Failed to update context count: ${error.message}`, 'error');
+                // Reload chats to restore the previous value
+                await loadChats();
+            }
+        }, 500); // 500ms debounce
+        
+    } catch (error) {
+        console.error(`Error in updateContextCount for ${botName}:`, error);
+        showToast(`Failed to update context count: ${error.message}`, 'error');
+        await loadChats();
+    }
+}
+
+function adjustContextCount(botName, chatJid, currentCount, delta) {
+    const newCount = Math.max(0, Math.min(50, currentCount + delta));
+    updateContextCount(botName, chatJid, newCount);
+}
+
 async function toggleLogs(botName, chatJid) {
     const logsKey = `${botName}::${chatJid}`;
     const safeJid = makeSafeId(chatJid);
@@ -1339,6 +1424,8 @@ function createBotCardWithChat(bot) {
     const safeLogsId = `${bot.name}-${safeJid}`;
     const runningClass = isRunning ? 'running' : '';
     const answerOwnerChecked = bot.answer_owner_messages !== false ? 'checked' : '';
+    const contextCount = bot.context_message_count || 0;
+    const contextHint = contextCount === 0 ? 'Disabled' : `${contextCount} previous message${contextCount !== 1 ? 's' : ''}`;
 
     return `
         <div class="bot-card-standalone ${runningClass}" data-bot-name="${bot.name}" data-chat-jid="${bot.chatJid}">
@@ -1369,6 +1456,23 @@ function createBotCardWithChat(bot) {
                                onchange="toggleAnswerOwner('${bot.name}', '${escapeAttr(bot.chatJid)}', this.checked)">
                         <span class="toggle-slider"></span>
                     </label>
+                </div>
+                <div class="bot-info-row bot-setting">
+                    <div class="setting-label-with-info">
+                        <span class="bot-info-label">Context Messages</span>
+                        <button class="info-icon" title="Number of previous messages sent as context to the bot.&#10;&#10;• 0 = Disabled (no context)&#10;• 3-10 = Normal (recommended)&#10;• 10+ = Advanced (more context)&#10;&#10;Higher values may increase response time." onclick="event.stopPropagation();">ℹ️</button>
+                    </div>
+                    <div class="number-input-group">
+                        <button class="decrement-btn" onclick="adjustContextCount('${bot.name}', '${escapeAttr(bot.chatJid)}', ${contextCount}, -1)">−</button>
+                        <input type="number" 
+                               class="context-input"
+                               min="0" 
+                               max="50" 
+                               value="${contextCount}"
+                               onchange="updateContextCount('${bot.name}', '${escapeAttr(bot.chatJid)}', parseInt(this.value))">
+                        <button class="increment-btn" onclick="adjustContextCount('${bot.name}', '${escapeAttr(bot.chatJid)}', ${contextCount}, 1)">+</button>
+                    </div>
+                    <div class="setting-hint">${contextHint}</div>
                 </div>
             </div>
             
@@ -1654,6 +1758,8 @@ function createExpandedRow(chat) {
         const logsVisible = state.expandedLogs.has(logsKey);
         const safeLogsId = `${bot.name}-${safeJid}`;
         const answerOwnerChecked = bot.answer_owner_messages !== false ? 'checked' : '';
+        const contextCount = bot.context_message_count || 0;
+        const contextHint = contextCount === 0 ? 'Disabled' : `${contextCount} previous message${contextCount !== 1 ? 's' : ''}`;
         
         return `
             <div class="bot-detail-item">
@@ -1674,6 +1780,23 @@ function createExpandedRow(chat) {
                                 <span class="toggle-slider"></span>
                             </label>
                         </label>
+                    </div>
+                    <div class="bot-detail-setting">
+                        <div class="setting-label-with-info">
+                            <label class="toggle-label">Context Messages:</label>
+                            <button class="info-icon" title="Number of previous messages sent as context to the bot.&#10;&#10;• 0 = Disabled (no context)&#10;• 3-10 = Normal (recommended)&#10;• 10+ = Advanced (more context)&#10;&#10;Higher values may increase response time." onclick="event.stopPropagation();">ℹ️</button>
+                        </div>
+                        <div class="number-input-group">
+                            <button class="decrement-btn" onclick="adjustContextCount('${bot.name}', '${escapeAttr(chat.chat_jid)}', ${contextCount}, -1)">−</button>
+                            <input type="number" 
+                                   class="context-input"
+                                   min="0" 
+                                   max="50" 
+                                   value="${contextCount}"
+                                   onchange="updateContextCount('${bot.name}', '${escapeAttr(chat.chat_jid)}', parseInt(this.value))">
+                            <button class="increment-btn" onclick="adjustContextCount('${bot.name}', '${escapeAttr(chat.chat_jid)}', ${contextCount}, 1)">+</button>
+                        </div>
+                        <div class="setting-hint">${contextHint}</div>
                     </div>
                 </div>
                 <div class="bot-detail-actions">
