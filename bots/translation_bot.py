@@ -17,6 +17,7 @@ class TranslationBot(BotBase):
     def process_message(self, message: Dict[str, Any], history: Optional[List[Dict[str, Any]]] = None) -> Optional[str]:
         """
         Process a message by translating it between English and Portuguese.
+        Supports text, image (with text extraction), and audio messages.
         
         Args:
             message: The message dict from WhatsApp API
@@ -25,18 +26,141 @@ class TranslationBot(BotBase):
         Returns:
             The translated text, or None if translation fails
         """
+        media_type = message.get("media_type")
+        message_id = message.get("id")
+        
+        # Handle IMAGE messages
+        if media_type == "image":
+            logger.info(f"[{self.NAME}] Processing image message {message_id}")
+            return self._process_image_message(message)
+        
+        # Handle AUDIO/VOICE messages
+        if media_type in ["audio", "voice", "ptt"]:  # ptt = push-to-talk (voice note)
+            logger.info(f"[{self.NAME}] Processing audio message {message_id}")
+            return self._process_audio_message(message)
+        
+        # Handle TEXT messages
         msg_text = message.get("content", "")
         if not msg_text:
             return None
         
-        # Check if it's an image message with caption
-        media_type = message.get("media_type")
-        if media_type == "image":
-            # For now, just translate the caption if present
-            # Future: could also extract text from image
-            if not msg_text:
-                return None
+        logger.info(f"[{self.NAME}] Processing text message {message_id}")
+        return self._process_text_message(msg_text, history)
+    
+    def _process_image_message(self, message: Dict[str, Any]) -> Optional[str]:
+        """
+        Process an image message by extracting and translating any text in it.
         
+        Args:
+            message: The message dict from WhatsApp API
+        
+        Returns:
+            Extracted and translated text, or error message
+        """
+        message_id = message.get("id")
+        chat_jid = self.chat_jid
+        
+        try:
+            # Download the image
+            logger.info(f"[{self.NAME}] Downloading image from message {message_id}")
+            image_bytes = self.whatsapp.download_and_decrypt_image(message_id, chat_jid)
+            
+            if not image_bytes:
+                logger.error(f"[{self.NAME}] Failed to download image")
+                return "❌ Sorry, I couldn't download the image."
+            
+            # Use vision AI to extract and translate text
+            prompt = """You are a multilingual image analysis assistant. Your task is to:
+
+1. Carefully examine the image for ANY text, writing, signs, labels, or written content
+2. If you find text:
+   - Extract all the text you can see
+   - Detect if the text is in English or Portuguese
+   - Translate it to the other language (English → Portuguese, Portuguese → English)
+   - Present it clearly in this format:
+     📝 Original Text: [the text you found]
+     🌍 Translation: [the translated text]
+3. If there's NO text in the image:
+   - Provide a brief description of what you see in the image
+   - Format: 📷 Image contains: [brief description]
+
+Be thorough and extract ALL visible text, even if it's small or partially visible."""
+
+            logger.info(f"[{self.NAME}] Calling vision AI for image analysis")
+            result = self.llm.call_with_image(prompt, image_bytes)
+            
+            if not result:
+                logger.error(f"[{self.NAME}] Vision AI call failed")
+                return "❌ Sorry, I couldn't analyze the image. Please try again."
+            
+            logger.info(f"[{self.NAME}] Image analysis successful")
+            return result
+            
+        except Exception as e:
+            logger.error(f"[{self.NAME}] Error processing image: {e}", exc_info=True)
+            return "❌ An error occurred while processing the image."
+    
+    def _process_audio_message(self, message: Dict[str, Any]) -> Optional[str]:
+        """
+        Process an audio/voice message by transcribing and translating it.
+        
+        Args:
+            message: The message dict from WhatsApp API
+        
+        Returns:
+            Transcription and translation, or error message
+        """
+        message_id = message.get("id")
+        chat_jid = self.chat_jid
+        
+        try:
+            # Download the audio
+            logger.info(f"[{self.NAME}] Downloading audio from message {message_id}")
+            audio_bytes = self.whatsapp.download_and_decrypt_audio(message_id, chat_jid)
+            
+            if not audio_bytes:
+                logger.error(f"[{self.NAME}] Failed to download audio")
+                return "❌ Sorry, I couldn't download the audio message."
+            
+            # Transcribe the audio using Whisper
+            logger.info(f"[{self.NAME}] Transcribing audio with Whisper API")
+            transcription = self.llm.transcribe_audio(audio_bytes)
+            
+            if not transcription:
+                logger.error(f"[{self.NAME}] Audio transcription failed")
+                return "❌ Sorry, I couldn't transcribe the audio. The audio might be unclear or in an unsupported format."
+            
+            logger.info(f"[{self.NAME}] Transcription successful: {transcription[:50]}...")
+            
+            # Translate the transcription
+            logger.info(f"[{self.NAME}] Translating transcription")
+            translation = self._translate_text(transcription)
+            
+            if not translation:
+                # If translation fails, at least return the transcription
+                return f"🎤 Transcription:\n{transcription}\n\n(Translation failed)"
+            
+            # Format the response with both transcription and translation
+            response = f"🎤 Transcription:\n{transcription}\n\n🌍 Translation:\n{translation}"
+            
+            logger.info(f"[{self.NAME}] Audio processing complete")
+            return response
+            
+        except Exception as e:
+            logger.error(f"[{self.NAME}] Error processing audio: {e}", exc_info=True)
+            return "❌ An error occurred while processing the audio message."
+    
+    def _process_text_message(self, msg_text: str, history: Optional[List[Dict[str, Any]]] = None) -> Optional[str]:
+        """
+        Process a text message by translating it.
+        
+        Args:
+            msg_text: The message text
+            history: Optional conversation history
+        
+        Returns:
+            Translated text, or None if translation fails
+        """
         # If history is provided, use it for context-aware translation
         if history:
             system_prompt = """You are a translation assistant. Your task is to:
@@ -54,18 +178,7 @@ class TranslationBot(BotBase):
             )
         else:
             # No history - use simple translation
-            prompt = f"""You are a translation assistant. Your task is to:
-1. Detect if the following message is in English or Portuguese
-2. Translate it to the other language (English → Portuguese, Portuguese → English)
-3. Return ONLY the translation, without any explanations or notes
-
-Message to translate:
-{msg_text}
-
-Respond with ONLY the translated text."""
-            
-            # Call LLM to translate
-            translated_text = self.llm.call(prompt)
+            translated_text = self._translate_text(msg_text)
         
         if not translated_text:
             logger.error(f"[{self.NAME}] Failed to translate message")
@@ -73,4 +186,26 @@ Respond with ONLY the translated text."""
         
         logger.info(f"[{self.NAME}] Translated: {msg_text[:30]}... -> {translated_text[:30]}...")
         return translated_text
+    
+    def _translate_text(self, text: str) -> Optional[str]:
+        """
+        Translate text between English and Portuguese.
+        
+        Args:
+            text: The text to translate
+        
+        Returns:
+            Translated text, or None if translation fails
+        """
+        prompt = f"""You are a translation assistant. Your task is to:
+1. Detect if the following text is in English or Portuguese
+2. Translate it to the other language (English → Portuguese, Portuguese → English)
+3. Return ONLY the translation, without any explanations or notes
+
+Text to translate:
+{text}
+
+Respond with ONLY the translated text."""
+        
+        return self.llm.call(prompt)
 

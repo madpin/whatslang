@@ -1,6 +1,7 @@
 """LLM service for making AI calls."""
 
 import base64
+import io
 import logging
 from typing import Optional, Dict, Any, List
 
@@ -188,5 +189,74 @@ class LLMService:
         
         except Exception as e:
             logger.error(f"Image LLM call error: {e}")
+            return None
+    
+    def transcribe_audio(self, audio_bytes: bytes, language: Optional[str] = None) -> Optional[str]:
+        """
+        Transcribe audio using OpenAI's Whisper API.
+        
+        Args:
+            audio_bytes: Raw bytes of the audio file
+            language: Optional ISO-639-1 language code (e.g., 'en', 'pt')
+                     If not provided, Whisper will auto-detect
+        
+        Returns:
+            The transcribed text, or None if transcription fails
+        """
+        try:
+            # Detect audio format by checking magic numbers (file signatures)
+            audio_format = None
+            
+            # Check for common audio formats
+            if audio_bytes.startswith(b'ID3') or audio_bytes.startswith(b'\xff\xfb') or audio_bytes.startswith(b'\xff\xf3'):
+                audio_format = 'mp3'
+            elif audio_bytes.startswith(b'OggS'):
+                audio_format = 'ogg'
+            elif audio_bytes.startswith(b'RIFF') and b'WAVE' in audio_bytes[:20]:
+                audio_format = 'wav'
+            elif audio_bytes.startswith(b'\x00\x00\x00') and b'ftyp' in audio_bytes[:20]:
+                audio_format = 'm4a'
+            elif audio_bytes.startswith(b'\x1aE\xdf\xa3'):
+                audio_format = 'webm'
+            else:
+                # Default to ogg (common for WhatsApp voice messages)
+                audio_format = 'ogg'
+                logger.warning(f"Could not detect audio format, defaulting to ogg")
+            
+            logger.info(f"Detected audio format: {audio_format}, size: {len(audio_bytes)} bytes")
+            
+            # Check file size (Whisper has a 25MB limit)
+            if len(audio_bytes) > 25 * 1024 * 1024:
+                logger.error(f"Audio file too large: {len(audio_bytes)} bytes (max 25MB)")
+                return None
+            
+            # Create a file-like object from the audio bytes
+            audio_file = io.BytesIO(audio_bytes)
+            audio_file.name = f"audio.{audio_format}"
+            
+            # Call Whisper API
+            logger.info(f"Calling Whisper API for transcription (language: {language or 'auto-detect'})")
+            
+            transcription_params = {
+                "model": "whisper-1",
+                "file": audio_file,
+            }
+            
+            if language:
+                transcription_params["language"] = language
+            
+            response = self.client.audio.transcriptions.create(**transcription_params)
+            
+            transcribed_text = response.text
+            
+            if not transcribed_text:
+                logger.error("Whisper returned empty transcription")
+                return None
+            
+            logger.info(f"Transcription successful: {len(transcribed_text)} characters")
+            return transcribed_text.strip()
+        
+        except Exception as e:
+            logger.error(f"Audio transcription error: {e}")
             return None
 
