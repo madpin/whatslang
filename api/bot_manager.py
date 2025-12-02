@@ -206,8 +206,14 @@ class BotManager:
             logger.error(f"Error starting bot {bot_name} for chat {chat_jid}: {e}", exc_info=True)
             return False
     
-    def stop_bot(self, bot_name: str, chat_jid: str) -> bool:
-        """Stop a bot for a specific chat."""
+    def stop_bot(self, bot_name: str, chat_jid: str, update_db: bool = True) -> bool:
+        """Stop a bot for a specific chat.
+        
+        Args:
+            bot_name: Name of the bot to stop
+            chat_jid: Chat JID where bot is running
+            update_db: Whether to update the running state in database (default True)
+        """
         bot_key = (bot_name, chat_jid)
         if bot_key not in self.bots:
             logger.info(f"Bot already stopped: {bot_name} for chat {chat_jid}")
@@ -235,10 +241,11 @@ class BotManager:
             if bot_key in self.bot_start_times:
                 del self.bot_start_times[bot_key]
             
-            # Mark bot as not running in database
-            self.database.set_bot_running_state(bot_name, chat_jid, running=False)
+            # Mark bot as not running in database (only if requested)
+            if update_db:
+                self.database.set_bot_running_state(bot_name, chat_jid, running=False)
             
-            logger.info(f"Stopped bot: {bot_name} for chat {chat_jid}")
+            logger.info(f"Stopped bot: {bot_name} for chat {chat_jid} (db_updated={update_db})")
             return True
         
         except Exception as e:
@@ -276,8 +283,13 @@ class BotManager:
         
         logger.info(f"Started {started_count} bot instance(s) from previous session")
     
-    def stop_all(self):
-        """Stop all running bots."""
+    def stop_all(self, update_db: bool = False):
+        """Stop all running bots.
+        
+        Args:
+            update_db: Whether to update the running state in database (default False).
+                      Set to False during shutdown to preserve bot state for next restart.
+        """
         bot_keys = list(self.bots.keys())
         for bot_name, chat_jid in bot_keys:
-            self.stop_bot(bot_name, chat_jid)
+            self.stop_bot(bot_name, chat_jid, update_db=update_db)

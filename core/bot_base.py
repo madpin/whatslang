@@ -197,9 +197,12 @@ class BotBase(ABC):
         if self.db.is_processed(message_id, self.NAME):
             return False
         
-        # Get message content
+        # Check if message has content OR media
         msg_text = message.get("content", "")
-        if not msg_text:
+        has_media = message.get("media_type") is not None
+        
+        # Skip if no content AND no media
+        if not msg_text and not has_media:
             return False
         
         # Skip messages from bots (check sender)
@@ -209,8 +212,8 @@ class BotBase(ABC):
                 logger.debug(f"[{self.NAME}] Skipping message from bot: {sender_jid}")
                 return False
         
-        # Skip messages that start with any bot prefix [*]
-        if msg_text.startswith("[") and "]" in msg_text[:20]:
+        # Skip messages that start with any bot prefix [*] (only for text messages)
+        if msg_text and msg_text.startswith("[") and "]" in msg_text[:20]:
             return False
         
         # Check if message is from owner and if bot should answer owner messages

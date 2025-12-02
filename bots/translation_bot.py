@@ -26,16 +26,44 @@ class TranslationBot(BotBase):
         Returns:
             The translated text, or None if translation fails
         """
-        media_type = message.get("media_type")
         message_id = message.get("id")
         
+        # Try multiple ways to detect media type (different WhatsApp APIs use different field names)
+        media_type = None
+        
+        # Method 1: Direct media_type field
+        if "media_type" in message:
+            media_type = message["media_type"]
+        
+        # Method 2: type field
+        elif "type" in message and message["type"] not in ["text", "chat", None]:
+            media_type = message["type"]
+        
+        # Method 3: Check for nested message types (common in WhatsApp Web API)
+        elif "message" in message and isinstance(message["message"], dict):
+            msg_obj = message["message"]
+            if "imageMessage" in msg_obj:
+                media_type = "image"
+            elif "audioMessage" in msg_obj or "pttMessage" in msg_obj:
+                media_type = "audio"
+        
+        # Method 4: Check mimetype
+        elif "mimetype" in message:
+            mime = message["mimetype"]
+            if mime.startswith("image/"):
+                media_type = "image"
+            elif mime.startswith("audio/"):
+                media_type = "audio"
+        
+        logger.info(f"[{self.NAME}] Detected media_type='{media_type}' for message {message_id}")
+        
         # Handle IMAGE messages
-        if media_type == "image":
+        if media_type and "image" in str(media_type).lower():
             logger.info(f"[{self.NAME}] Processing image message {message_id}")
             return self._process_image_message(message)
         
         # Handle AUDIO/VOICE messages
-        if media_type in ["audio", "voice", "ptt"]:  # ptt = push-to-talk (voice note)
+        if media_type and any(x in str(media_type).lower() for x in ["audio", "voice", "ptt"]):
             logger.info(f"[{self.NAME}] Processing audio message {message_id}")
             return self._process_audio_message(message)
         

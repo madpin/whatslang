@@ -13,12 +13,25 @@ logger = logging.getLogger(__name__)
 class LLMService:
     """Service for interacting with LLM APIs."""
     
-    def __init__(self, api_key: str, model: str = "gpt-5", base_url: Optional[str] = None):
+    def __init__(
+        self, 
+        api_key: str, 
+        model: str = "gpt-5", 
+        base_url: Optional[str] = None,
+        vision_model: Optional[str] = None,
+        audio_model: Optional[str] = None
+    ):
         if base_url:
             self.client = OpenAI(api_key=api_key, base_url=base_url)
         else:
             self.client = OpenAI(api_key=api_key)
         self.model = model
+        # Use separate models for vision and audio if specified, otherwise fall back to main model
+        self.vision_model = vision_model or model
+        # Whisper model is always "whisper-1" unless overridden
+        self.audio_model = audio_model or "whisper-1"
+        
+        logger.info(f"LLMService initialized - Text: {self.model}, Vision: {self.vision_model}, Audio: {self.audio_model}")
     
     def call(self, prompt: str, text: str = "") -> Optional[str]:
         """
@@ -167,7 +180,7 @@ class LLMService:
         
         try:
             response = self.client.chat.completions.create(
-                model=self.model,
+                model=self.vision_model,
                 messages=[
                     {
                         "role": "user",
@@ -238,7 +251,7 @@ class LLMService:
             logger.info(f"Calling Whisper API for transcription (language: {language or 'auto-detect'})")
             
             transcription_params = {
-                "model": "whisper-1",
+                "model": self.audio_model,
                 "file": audio_file,
             }
             

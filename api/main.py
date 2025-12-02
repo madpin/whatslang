@@ -128,6 +128,8 @@ CHAT_JID = os.environ.get('CHAT_JID', whatsapp_config.get('chat_jid'))
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', openai_config.get('api_key'))
 OPENAI_BASE_URL = os.environ.get('OPENAI_BASE_URL', openai_config.get('base_url', 'https://api.openai.com/v1'))
 OPENAI_MODEL = os.environ.get('OPENAI_MODEL', openai_config.get('model', 'gpt-4'))
+OPENAI_VISION_MODEL = os.environ.get('OPENAI_VISION_MODEL', openai_config.get('vision_model'))
+OPENAI_AUDIO_MODEL = os.environ.get('OPENAI_AUDIO_MODEL', openai_config.get('audio_model', 'whisper-1'))
 
 # Optional configuration
 POLL_INTERVAL = int(os.environ.get('POLL_INTERVAL', bot_settings.get('poll_interval', 5)))
@@ -178,9 +180,11 @@ async def lifespan(app: FastAPI):
         llm_service = LLMService(
             api_key=OPENAI_API_KEY,
             model=OPENAI_MODEL,
-            base_url=OPENAI_BASE_URL
+            base_url=OPENAI_BASE_URL,
+            vision_model=OPENAI_VISION_MODEL,
+            audio_model=OPENAI_AUDIO_MODEL
         )
-        logger.info(f"LLM service initialized (model: {OPENAI_MODEL})")
+        logger.info(f"LLM service initialized (model: {OPENAI_MODEL}, vision: {OPENAI_VISION_MODEL or 'same'}, audio: {OPENAI_AUDIO_MODEL})")
         
         database = MessageDatabase(DB_PATH)
         logger.info("Database initialized")
