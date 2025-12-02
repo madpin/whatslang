@@ -3,8 +3,11 @@
 import base64
 import io
 import logging
+import os
+import tempfile
 from typing import Optional, Dict, Any, List
 
+import ffmpeg
 from openai import OpenAI
 
 logger = logging.getLogger(__name__)
@@ -203,6 +206,86 @@ class LLMService:
         except Exception as e:
             logger.error(f"Image LLM call error: {e}")
             return None
+    
+    def extract_audio_from_video(self, video_bytes: bytes) -> Optional[bytes]:
+        """
+        Extract audio track from video file using ffmpeg.
+        
+        Args:
+            video_bytes: Raw bytes of the video file
+        
+        Returns:
+            Audio file bytes (mp3 format), or None if extraction fails
+        """
+        temp_video_path = None
+        temp_audio_path = None
+        
+        try:
+            logger.info(f"Extracting audio from video: size={len(video_bytes)} bytes")
+            
+            # Create temporary files
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as temp_video:
+                temp_video.write(video_bytes)
+                temp_video_path = temp_video.name
+            
+            # Create temp file for output audio
+            temp_audio_fd, temp_audio_path = tempfile.mkstemp(suffix='.mp3')
+            os.close(temp_audio_fd)  # Close the file descriptor, ffmpeg will write to it
+            
+            logger.info(f"Temporary video file: {temp_video_path}")
+            logger.info(f"Temporary audio file: {temp_audio_path}")
+            
+            # Extract audio using ffmpeg
+            try:
+                (
+                    ffmpeg
+                    .input(temp_video_path)
+                    .output(temp_audio_path, acodec='libmp3lame', ac=1, ar='16000', audio_bitrate='64k')
+                    .overwrite_output()
+                    .run(capture_stdout=True, capture_stderr=True, quiet=True)
+                )
+                logger.info("Audio extraction successful")
+            except ffmpeg.Error as e:
+                error_message = e.stderr.decode() if e.stderr else str(e)
+                
+                # Check if video has no audio stream
+                if 'does not contain any stream' in error_message or 'Output file is empty' in error_message:
+                    logger.warning("Video does not contain an audio stream")
+                    return None
+                
+                logger.error(f"FFmpeg error: {error_message}")
+                return None
+            
+            # Read extracted audio file
+            if not os.path.exists(temp_audio_path) or os.path.getsize(temp_audio_path) == 0:
+                logger.warning("Audio extraction resulted in empty file - video may not have audio")
+                return None
+            
+            with open(temp_audio_path, 'rb') as audio_file:
+                audio_bytes = audio_file.read()
+            
+            logger.info(f"Extracted audio: {len(audio_bytes)} bytes")
+            return audio_bytes
+            
+        except Exception as e:
+            logger.error(f"Error extracting audio from video: {e}", exc_info=True)
+            return None
+        
+        finally:
+            # Clean up temporary files
+            if temp_video_path and os.path.exists(temp_video_path):
+                try:
+                    os.unlink(temp_video_path)
+                    logger.debug(f"Cleaned up temp video file: {temp_video_path}")
+                except Exception as e:
+                    logger.warning(f"Failed to delete temp video file: {e}")
+            
+            if temp_audio_path and os.path.exists(temp_audio_path):
+                try:
+                    os.unlink(temp_audio_path)
+                    logger.debug(f"Cleaned up temp audio file: {temp_audio_path}")
+                except Exception as e:
+                    logger.warning(f"Failed to delete temp audio file: {e}")
     
     def transcribe_audio(self, audio_bytes: bytes, language: Optional[str] = None) -> Optional[str]:
         """

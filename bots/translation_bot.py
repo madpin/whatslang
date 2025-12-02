@@ -17,7 +17,7 @@ class TranslationBot(BotBase):
     def process_message(self, message: Dict[str, Any], history: Optional[List[Dict[str, Any]]] = None) -> Optional[str]:
         """
         Process a message by translating it between English and Portuguese.
-        Supports text, image (with text extraction), and audio messages.
+        Supports text, image (with text extraction), audio, and video messages.
         
         Args:
             message: The message dict from WhatsApp API
@@ -46,6 +46,8 @@ class TranslationBot(BotBase):
                 media_type = "image"
             elif "audioMessage" in msg_obj or "pttMessage" in msg_obj:
                 media_type = "audio"
+            elif "videoMessage" in msg_obj:
+                media_type = "video"
         
         # Method 4: Check mimetype
         elif "mimetype" in message:
@@ -54,6 +56,8 @@ class TranslationBot(BotBase):
                 media_type = "image"
             elif mime.startswith("audio/"):
                 media_type = "audio"
+            elif mime.startswith("video/"):
+                media_type = "video"
         
         logger.info(f"[{self.NAME}] Detected media_type='{media_type}' for message {message_id}")
         
@@ -66,6 +70,11 @@ class TranslationBot(BotBase):
         if media_type and any(x in str(media_type).lower() for x in ["audio", "voice", "ptt"]):
             logger.info(f"[{self.NAME}] Processing audio message {message_id}")
             return self._process_audio_message(message)
+        
+        # Handle VIDEO messages
+        if media_type and "video" in str(media_type).lower():
+            logger.info(f"[{self.NAME}] Processing video message {message_id}")
+            return self._process_video_message(message)
         
         # Handle TEXT messages
         msg_text = message.get("content", "")
@@ -177,6 +186,80 @@ Be thorough and extract ALL visible text, even if it's small or partially visibl
         except Exception as e:
             logger.error(f"[{self.NAME}] Error processing audio: {e}", exc_info=True)
             return "❌ An error occurred while processing the audio message."
+    
+    def _process_video_message(self, message: Dict[str, Any]) -> Optional[str]:
+        """
+        Process a video message by extracting and transcribing its audio track.
+        
+        Args:
+            message: The message dict from WhatsApp API
+        
+        Returns:
+            Audio transcription and translation, or error message
+        """
+        message_id = message.get("id")
+        chat_jid = self.chat_jid
+        
+        try:
+            # Download the video
+            logger.info(f"[{self.NAME}] Downloading video from message {message_id}")
+            video_bytes = self.whatsapp.download_and_decrypt_video(message_id, chat_jid)
+            
+            if not video_bytes:
+                logger.error(f"[{self.NAME}] Failed to download video")
+                return "❌ Sorry, I couldn't download the video."
+            
+            # Check video size (reasonable limit for processing)
+            video_size_mb = len(video_bytes) / (1024 * 1024)
+            logger.info(f"[{self.NAME}] Video size: {video_size_mb:.2f} MB")
+            
+            if video_size_mb > 100:
+                logger.warning(f"[{self.NAME}] Video is very large: {video_size_mb:.2f} MB")
+                return f"❌ Video is too large ({video_size_mb:.1f} MB). Please send videos under 100 MB."
+            
+            # Extract audio from video
+            logger.info(f"[{self.NAME}] Extracting audio from video")
+            audio_bytes = self.llm.extract_audio_from_video(video_bytes)
+            
+            if not audio_bytes:
+                logger.warning(f"[{self.NAME}] Video has no audio track or extraction failed")
+                return "❌ This video doesn't have an audio track, or I couldn't extract it. Please make sure the video has sound."
+            
+            # Check extracted audio size (Whisper has 25MB limit)
+            audio_size_mb = len(audio_bytes) / (1024 * 1024)
+            logger.info(f"[{self.NAME}] Extracted audio size: {audio_size_mb:.2f} MB")
+            
+            if audio_size_mb > 25:
+                logger.error(f"[{self.NAME}] Extracted audio exceeds Whisper's 25MB limit")
+                return f"❌ The video's audio is too long ({audio_size_mb:.1f} MB). Whisper API supports up to 25 MB. Please send a shorter video."
+            
+            # Transcribe the audio using Whisper
+            logger.info(f"[{self.NAME}] Transcribing video audio with Whisper API")
+            transcription = self.llm.transcribe_audio(audio_bytes)
+            
+            if not transcription:
+                logger.error(f"[{self.NAME}] Video audio transcription failed")
+                return "❌ Sorry, I couldn't transcribe the video's audio. The audio might be unclear or in an unsupported format."
+            
+            logger.info(f"[{self.NAME}] Transcription successful: {transcription[:50]}...")
+            
+            # Translate the transcription
+            logger.info(f"[{self.NAME}] Translating transcription")
+            translation = self._translate_text(transcription)
+            
+            if not translation:
+                # If translation fails, at least return the transcription
+                return f"🎬 Video Audio Transcription:\n{transcription}\n\n(Translation failed)"
+            
+            # Format the response with both transcription and translation
+            response = f"🎬 Video Audio Transcription:\n{transcription}\n\n🌍 Translation:\n{translation}"
+            
+            logger.info(f"[{self.NAME}] Video audio processing complete")
+            return response
+            
+        except Exception as e:
+            logger.error(f"[{self.NAME}] Error processing video: {e}", exc_info=True)
+            return "❌ An error occurred while processing the video."
     
     def _process_text_message(self, msg_text: str, history: Optional[List[Dict[str, Any]]] = None) -> Optional[str]:
         """

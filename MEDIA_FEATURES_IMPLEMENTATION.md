@@ -2,10 +2,11 @@
 
 ## Overview
 
-Successfully implemented image and audio transcription/translation features for the WhatsApp Translation Bot. The bot now supports:
+Successfully implemented image, audio, and video transcription/translation features for the WhatsApp Translation Bot. The bot now supports:
 
 - 📷 **Image Text Extraction & Translation**: Extracts and translates text from images using Vision AI
 - 🎤 **Audio Transcription & Translation**: Transcribes and translates voice/audio messages using OpenAI Whisper
+- 🎬 **Video Audio Transcription & Translation**: Extracts audio from videos and transcribes/translates it
 
 ## Implementation Details
 
@@ -19,9 +20,25 @@ Successfully implemented image and audio transcription/translation features for 
 - Returns raw audio bytes for processing
 - Handles all error cases with proper logging
 
+**Added Method**: `download_and_decrypt_video(message_id, chat_jid)`
+- Downloads and decrypts video messages from WhatsApp API
+- Uses the same `/message/{id}/download` endpoint
+- Returns raw video bytes for processing
+- Uses longer timeouts (60s) for larger video files
+- Handles all error cases with proper logging
+
 ### 2. LLM Service Enhancements
 
 **File**: `core/llm_service.py`
+
+**Added Method**: `extract_audio_from_video(video_bytes)`
+- Extracts audio track from video files using ffmpeg
+- Writes video to temporary file
+- Uses ffmpeg to extract audio in mp3 format (16kHz, mono, 64k bitrate)
+- Returns extracted audio bytes
+- Cleans up temporary files automatically
+- Detects videos without audio tracks
+- Handles extraction errors gracefully
 
 **Added Method**: `transcribe_audio(audio_bytes, language=None)`
 - Uses OpenAI's Whisper API (`/v1/audio/transcriptions`)
@@ -30,7 +47,7 @@ Successfully implemented image and audio transcription/translation features for 
 - Handles up to 25MB audio files (Whisper limit)
 - Returns transcribed text with full error handling
 
-**Enhanced Import**: Added `io` module for creating file-like objects from bytes
+**Enhanced Imports**: Added `ffmpeg`, `os`, and `tempfile` modules
 
 ### 3. Translation Bot Enhancements
 
@@ -40,6 +57,7 @@ Successfully implemented image and audio transcription/translation features for 
 Now intelligently routes messages based on media type:
 - `media_type == "image"` → `_process_image_message()`
 - `media_type in ["audio", "voice", "ptt"]` → `_process_audio_message()`
+- `media_type == "video"` → `_process_video_message()`
 - No media_type or text → `_process_text_message()`
 
 **New Private Methods**:
@@ -58,14 +76,25 @@ Now intelligently routes messages based on media type:
    - Returns both transcription and translation
    - Handles errors gracefully
 
-3. **`_process_text_message(msg_text, history)`**:
+3. **`_process_video_message(message)`**:
+   - Downloads video using WhatsApp client
+   - Checks video size (max 100MB)
+   - Extracts audio track using ffmpeg
+   - Checks extracted audio size (max 25MB for Whisper)
+   - Transcribes audio using Whisper API
+   - Translates the transcription
+   - Returns both transcription and translation
+   - Handles videos without audio gracefully
+   - Handles errors with user-friendly messages
+
+4. **`_process_text_message(msg_text, history)`**:
    - Handles traditional text translation
    - Supports context-aware translation with history
    - Maintains existing translation behavior
 
-4. **`_translate_text(text)`**:
+5. **`_translate_text(text)`**:
    - Helper method for simple text translation
-   - Reused across audio and text processing
+   - Reused across audio, video, and text processing
    - Auto-detects language and translates
 
 ## Features
@@ -114,6 +143,32 @@ OR (if no text):
 - ✅ Context-aware translation with history
 - ✅ Auto-detects language direction
 
+### Video Processing
+
+**Capabilities**:
+- ✅ Extracts audio track from video files
+- ✅ Transcribes video audio using Whisper
+- ✅ Translates transcription (Portuguese ↔ English)
+- ✅ Supports videos up to 100MB
+- ✅ Handles various video formats (mp4, mov, avi, etc.)
+- ✅ Detects videos without audio track
+- ✅ Auto-converts audio to Whisper-compatible format
+
+**Response Format**:
+```
+🎬 Video Audio Transcription:
+[transcribed audio from video]
+
+🌍 Translation:
+[translated text]
+```
+
+**Requirements**:
+- FFmpeg must be installed on the server
+- `ffmpeg-python` Python package
+- Video file size under 100MB
+- Extracted audio must be under 25MB (Whisper limit)
+
 ## Error Handling
 
 All features include comprehensive error handling:
@@ -121,8 +176,10 @@ All features include comprehensive error handling:
 - **Media Download Failures**: Returns user-friendly error messages
 - **API Failures**: Logs detailed errors and returns helpful responses
 - **Unsupported Formats**: Detects and reports unsupported media types
-- **Large Files**: Checks size limits before processing
+- **Large Files**: Checks size limits before processing (100MB for videos, 25MB for audio)
 - **Empty Results**: Handles edge cases gracefully
+- **Videos Without Audio**: Detects and informs user when video has no audio track
+- **FFmpeg Failures**: Catches and reports extraction errors
 
 ## Testing Guide
 
@@ -133,6 +190,7 @@ All features include comprehensive error handling:
 3. **API Keys**: Valid OpenAI API key with access to:
    - Chat Completions (for Vision API)
    - Whisper API (for audio transcription)
+4. **FFmpeg**: FFmpeg must be installed on the server (for video audio extraction)
 
 ### Test Cases
 
@@ -200,13 +258,57 @@ All features include comprehensive error handling:
 [ai] [Translated text in the other language]
 ```
 
-#### 7. Error Cases
+#### 7. Video with Portuguese Audio
+
+**Test**: Send a video message containing Portuguese speech
+
+**Expected Result**:
+```
+[ai] 🎬 Video Audio Transcription:
+[Portuguese transcribed text from video]
+
+🌍 Translation:
+[English translation]
+```
+
+#### 8. Video with English Audio
+
+**Test**: Send a video message containing English speech
+
+**Expected Result**:
+```
+[ai] 🎬 Video Audio Transcription:
+[English transcribed text from video]
+
+🌍 Translation:
+[Portuguese translation]
+```
+
+#### 9. Video without Audio
+
+**Test**: Send a video without audio track (muted video)
+
+**Expected Result**:
+```
+[ai] ❌ This video doesn't have an audio track, or I couldn't extract it. Please make sure the video has sound.
+```
+
+#### 10. Large Video File
+
+**Test**: Send a video larger than 100MB
+
+**Expected Result**:
+```
+[ai] ❌ Video is too large ([size] MB). Please send videos under 100 MB.
+```
+
+#### 11. Error Cases
 
 **Test**: Send corrupted or very large media files
 
 **Expected Result**:
 ```
-[ai] ❌ Sorry, I couldn't [download/process] the [image/audio]...
+[ai] ❌ Sorry, I couldn't [download/process] the [image/audio/video]...
 ```
 
 ### Manual Testing Steps

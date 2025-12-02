@@ -478,4 +478,59 @@ class WhatsAppClient:
         except Exception as e:
             logger.error(f"Unexpected error in download_and_decrypt_audio: {e}")
             return None
+    
+    def download_and_decrypt_video(self, message_id: str, chat_jid: str) -> Optional[bytes]:
+        """
+        Download and decrypt WhatsApp video media using the API.
+        
+        WhatsApp media is E2E encrypted. This method:
+        1. Calls /message/{id}/download to trigger server-side decryption
+        2. Gets the decrypted file path
+        3. Downloads the decrypted video file
+        
+        Args:
+            message_id: The message ID containing the video
+            chat_jid: The chat JID (phone number)
+        
+        Returns:
+            Video file bytes, or None if download fails
+        """
+        try:
+            # Step 1: Trigger media download/decryption on server
+            download_url = f"{self.base_url}/message/{message_id}/download"
+            params = {"phone": chat_jid}
+            
+            logger.info(f"Requesting video media decryption for message {message_id}")
+            response = self.session.get(download_url, params=params, timeout=60)  # Longer timeout for videos
+            response.raise_for_status()
+            
+            data = response.json()
+            if data.get("code") != "SUCCESS":
+                logger.error(f"Video media download failed: {data.get('message')}")
+                return None
+            
+            # Step 2: Get the decrypted file path
+            file_path = data.get("results", {}).get("file_path")
+            if not file_path:
+                logger.error(f"No file_path in response: {data}")
+                return None
+            
+            logger.info(f"Video media decrypted to: {file_path}")
+            
+            # Step 3: Download the decrypted video file
+            video_url = f"{self.base_url}/{file_path}"
+            video_response = self.session.get(video_url, timeout=60)  # Longer timeout for videos
+            video_response.raise_for_status()
+            
+            content_length = len(video_response.content)
+            logger.info(f"Downloaded decrypted video: Size={content_length} bytes")
+            
+            return video_response.content
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error downloading/decrypting video: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error in download_and_decrypt_video: {e}")
+            return None
 
