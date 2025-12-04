@@ -145,7 +145,7 @@ Be thorough and extract ALL visible text, even if it's small or partially visibl
             message: The message dict from WhatsApp API
         
         Returns:
-            Transcription and translation, or error message
+            Transcription and translation, or error message (always returns a response)
         """
         message_id = message.get("id")
         chat_jid = self.chat_jid
@@ -157,15 +157,15 @@ Be thorough and extract ALL visible text, even if it's small or partially visibl
             
             if not audio_bytes:
                 logger.error(f"[{self.NAME}] Failed to download audio")
-                return "❌ Sorry, I couldn't download the audio message."
+                return "❌ Sorry, I couldn't download the audio message. Please try sending it again."
             
-            # Transcribe the audio using Whisper
+            # Transcribe the audio using Whisper (now includes retry logic)
             logger.info(f"[{self.NAME}] Transcribing audio with Whisper API")
             transcription = self.llm.transcribe_audio(audio_bytes)
             
             if not transcription:
-                logger.error(f"[{self.NAME}] Audio transcription failed")
-                return "❌ Sorry, I couldn't transcribe the audio. The audio might be unclear or in an unsupported format."
+                logger.error(f"[{self.NAME}] Audio transcription failed after retries")
+                return "❌ Sorry, I couldn't transcribe the audio after multiple attempts. The audio might be unclear, in an unsupported format, or there might be a temporary service issue. Please try again later."
             
             logger.info(f"[{self.NAME}] Transcription successful: {transcription[:50]}...")
             
@@ -175,7 +175,8 @@ Be thorough and extract ALL visible text, even if it's small or partially visibl
             
             if not translation:
                 # If translation fails, at least return the transcription
-                return f"🎤 Transcription:\n{transcription}\n\n(Translation failed)"
+                logger.warning(f"[{self.NAME}] Translation failed, returning transcription only")
+                return f"🎤 Transcription:\n{transcription}\n\n⚠️ Translation service temporarily unavailable."
             
             # Format the response with both transcription and translation
             response = f"🎤 Transcription:\n{transcription}\n\n🌍 Translation:\n{translation}"
@@ -184,8 +185,8 @@ Be thorough and extract ALL visible text, even if it's small or partially visibl
             return response
             
         except Exception as e:
-            logger.error(f"[{self.NAME}] Error processing audio: {e}", exc_info=True)
-            return "❌ An error occurred while processing the audio message."
+            logger.error(f"[{self.NAME}] Unexpected error processing audio: {e}", exc_info=True)
+            return f"❌ An unexpected error occurred while processing the audio message. Please try again or contact support if the issue persists. (Error: {type(e).__name__})"
     
     def _process_video_message(self, message: Dict[str, Any]) -> Optional[str]:
         """
@@ -195,7 +196,7 @@ Be thorough and extract ALL visible text, even if it's small or partially visibl
             message: The message dict from WhatsApp API
         
         Returns:
-            Audio transcription and translation, or error message
+            Audio transcription and translation, or error message (always returns a response)
         """
         message_id = message.get("id")
         chat_jid = self.chat_jid
@@ -207,7 +208,7 @@ Be thorough and extract ALL visible text, even if it's small or partially visibl
             
             if not video_bytes:
                 logger.error(f"[{self.NAME}] Failed to download video")
-                return "❌ Sorry, I couldn't download the video."
+                return "❌ Sorry, I couldn't download the video. Please try sending it again."
             
             # Check video size (reasonable limit for processing)
             video_size_mb = len(video_bytes) / (1024 * 1024)
@@ -233,13 +234,13 @@ Be thorough and extract ALL visible text, even if it's small or partially visibl
                 logger.error(f"[{self.NAME}] Extracted audio exceeds Whisper's 25MB limit")
                 return f"❌ The video's audio is too long ({audio_size_mb:.1f} MB). Whisper API supports up to 25 MB. Please send a shorter video."
             
-            # Transcribe the audio using Whisper
+            # Transcribe the audio using Whisper (now includes retry logic)
             logger.info(f"[{self.NAME}] Transcribing video audio with Whisper API")
             transcription = self.llm.transcribe_audio(audio_bytes)
             
             if not transcription:
-                logger.error(f"[{self.NAME}] Video audio transcription failed")
-                return "❌ Sorry, I couldn't transcribe the video's audio. The audio might be unclear or in an unsupported format."
+                logger.error(f"[{self.NAME}] Video audio transcription failed after retries")
+                return "❌ Sorry, I couldn't transcribe the video's audio after multiple attempts. The audio might be unclear, in an unsupported format, or there might be a temporary service issue. Please try again later."
             
             logger.info(f"[{self.NAME}] Transcription successful: {transcription[:50]}...")
             
@@ -249,7 +250,8 @@ Be thorough and extract ALL visible text, even if it's small or partially visibl
             
             if not translation:
                 # If translation fails, at least return the transcription
-                return f"🎬 Video Audio Transcription:\n{transcription}\n\n(Translation failed)"
+                logger.warning(f"[{self.NAME}] Translation failed, returning transcription only")
+                return f"🎬 Video Audio Transcription:\n{transcription}\n\n⚠️ Translation service temporarily unavailable."
             
             # Format the response with both transcription and translation
             response = f"🎬 Video Audio Transcription:\n{transcription}\n\n🌍 Translation:\n{translation}"
@@ -258,8 +260,8 @@ Be thorough and extract ALL visible text, even if it's small or partially visibl
             return response
             
         except Exception as e:
-            logger.error(f"[{self.NAME}] Error processing video: {e}", exc_info=True)
-            return "❌ An error occurred while processing the video."
+            logger.error(f"[{self.NAME}] Unexpected error processing video: {e}", exc_info=True)
+            return f"❌ An unexpected error occurred while processing the video. Please try again or contact support if the issue persists. (Error: {type(e).__name__})"
     
     def _process_text_message(self, msg_text: str, history: Optional[List[Dict[str, Any]]] = None) -> Optional[str]:
         """
