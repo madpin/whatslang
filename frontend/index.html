@@ -1,14 +1,394 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>WhatSlang - WhatsApp Bot Platform</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
-</html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#6366f1">
+    <title>WhatsLang - Multi-Chat Bot Manager</title>
+    <link rel="stylesheet" href="styles.css?v=20250116">
+    <meta name="description" content="Modern dashboard for managing WhatsApp bots across multiple chats">
+</head>
+<body>
+    <!-- Mobile Menu Overlay -->
+    <div class="mobile-overlay" id="mobileOverlay"></div>
 
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <div class="logo-icon">💬</div>
+                <span class="logo-text">WhatsLang</span>
+            </div>
+            <button class="mobile-close" id="closeSidebar">×</button>
+        </div>
+
+        <nav class="sidebar-nav">
+            <a href="#" class="nav-item active" data-view="dashboard">
+                <span class="nav-icon">📊</span>
+                <span class="nav-label">Dashboard</span>
+            </a>
+            <a href="#" class="nav-item" data-view="chats">
+                <span class="nav-icon">💬</span>
+                <span class="nav-label">Chats</span>
+                <span class="nav-badge" id="chatsCount">0</span>
+            </a>
+            <a href="#" class="nav-item" data-view="bots">
+                <span class="nav-icon">🤖</span>
+                <span class="nav-label">Bots</span>
+                <span class="nav-badge" id="botsCount">0</span>
+            </a>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="stats-mini">
+                <div class="stat-mini">
+                    <div class="stat-mini-value" id="statsRunning">0</div>
+                    <div class="stat-mini-label">Running</div>
+                </div>
+                <div class="stat-mini">
+                    <div class="stat-mini-value" id="statsStopped">0</div>
+                    <div class="stat-mini-label">Stopped</div>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Top Bar -->
+        <header class="top-bar">
+            <button class="mobile-menu-btn" id="mobileMenuBtn">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+            
+            <div class="top-bar-title">
+                <h1 id="pageTitle">Dashboard</h1>
+                <p class="top-bar-subtitle" id="pageSubtitle">Overview of your bot operations</p>
+            </div>
+
+            <div class="top-bar-actions">
+                <button class="icon-btn" id="refreshBtn" title="Sync from WhatsApp and reload list">
+                    <span class="icon">🔄</span>
+                </button>
+                <div class="status-indicator">
+                    <span class="status-dot pulse"></span>
+                    <span class="status-text">Live</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Dashboard Overview -->
+        <section class="dashboard-overview" id="dashboardOverview">
+            <div class="stats-grid">
+                <div class="stat-card glass-card">
+                    <div class="stat-icon purple">💬</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="totalChats">0</div>
+                        <div class="stat-label">Total Chats</div>
+                    </div>
+                    <div class="stat-trend up">
+                        <span class="trend-icon">↗</span>
+                    </div>
+                </div>
+
+                <div class="stat-card glass-card">
+                    <div class="stat-icon green">▶️</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="runningBots">0</div>
+                        <div class="stat-label">Bots Running</div>
+                    </div>
+                    <div class="stat-trend up">
+                        <span class="trend-icon">↗</span>
+                    </div>
+                </div>
+
+                <div class="stat-card glass-card">
+                    <div class="stat-icon blue">⏸</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="stoppedBots">0</div>
+                        <div class="stat-label">Bots Stopped</div>
+                    </div>
+                    <div class="stat-trend">
+                        <span class="trend-icon">━</span>
+                    </div>
+                </div>
+
+                <div class="stat-card glass-card">
+                    <div class="stat-icon cyan">⚙️</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="availableBots">0</div>
+                        <div class="stat-label">Available Bots</div>
+                    </div>
+                    <div class="stat-trend">
+                        <span class="trend-icon">━</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="quick-actions glass-card">
+                <h3 class="section-title">Quick Actions</h3>
+                <div class="action-buttons">
+                    <button class="action-btn primary" id="syncChatsBtn" title="Sync from WhatsApp">
+                        <span class="btn-icon">🔄</span>
+                        <span class="btn-text">Sync Chats</span>
+                    </button>
+                    <button class="action-btn secondary" id="addChatBtn">
+                        <span class="btn-icon">➕</span>
+                        <span class="btn-text">Add Chat</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Add Chat Form (Hidden by default) -->
+        <section class="add-chat-section glass-card" id="addChatSection" style="display: none;">
+            <div class="section-header">
+                <h3 class="section-title">Add New Chat</h3>
+                <button class="close-btn" id="closeAddChat">×</button>
+            </div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="manualChatJid">Chat JID</label>
+                    <input 
+                        type="text" 
+                        id="manualChatJid" 
+                        placeholder="e.g., 123456789@g.us"
+                        class="form-input"
+                    />
+                </div>
+                <div class="form-group">
+                    <label for="manualChatName">Chat Name (Optional)</label>
+                    <input 
+                        type="text" 
+                        id="manualChatName" 
+                        placeholder="Will auto-fetch from WhatsApp"
+                        class="form-input"
+                    />
+                </div>
+            </div>
+            <button class="action-btn primary" id="submitAddChat">
+                <span class="btn-icon">✓</span>
+                <span class="btn-text">Add Chat</span>
+            </button>
+        </section>
+
+        <!-- Chats Section -->
+        <section class="chats-section">
+            <div class="section-header-bar">
+                <h2 class="section-title-large">Your Chats</h2>
+                <div class="header-actions">
+                    <!-- View Toggle -->
+                    <div class="view-toggle">
+                        <button class="view-toggle-btn" data-view="table" id="tableViewBtn" title="Table View">
+                            <span class="icon">📊</span>
+                        </button>
+                        <button class="view-toggle-btn active" data-view="cards" id="cardsViewBtn" title="Cards View">
+                            <span class="icon">🎴</span>
+                        </button>
+                    </div>
+                    
+                    <div class="search-box">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" placeholder="Search by chat name or phone/JID" id="searchChats" class="search-input" title="Search by chat name or phone/JID">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Filter Bar -->
+            <div class="filter-bar glass-card" id="filterBar">
+                <div class="filter-group">
+                    <label class="filter-label">Activity:</label>
+                    <select class="filter-select" id="activityFilter">
+                        <option value="">All</option>
+                        <option value="active">Active (Today)</option>
+                        <option value="recent">Recent (This Week)</option>
+                        <option value="idle">Idle (>1 Week)</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label class="filter-label">Type:</label>
+                    <select class="filter-select" id="chatTypeFilter">
+                        <option value="">All</option>
+                        <option value="group">Groups</option>
+                        <option value="individual">Individual</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label class="filter-label">Bots:</label>
+                    <select class="filter-select" id="botStatusFilter">
+                        <option value="">All</option>
+                        <option value="running">Has Running</option>
+                        <option value="none">No Bots</option>
+                    </select>
+                </div>
+                
+                <button class="filter-clear-btn" id="clearFiltersBtn">
+                    <span class="icon">✕</span> Clear
+                </button>
+                
+                <div class="filter-info" id="filterInfo">
+                    Showing <strong id="showingCount">0</strong> of <strong id="totalCount">0</strong> chats
+                </div>
+            </div>
+            
+            <!-- Bulk Actions Toolbar (hidden by default) -->
+            <div class="bulk-actions-bar glass-card" id="bulkActionsBar" style="display: none;">
+                <div class="bulk-actions-info">
+                    <span id="selectedCount">0</span> selected
+                </div>
+                
+                <div class="bulk-actions-buttons">
+                    <button class="bulk-action-btn" id="bulkStartBots">
+                        <span class="icon">▶️</span> Start Bots
+                    </button>
+                    <button class="bulk-action-btn" id="bulkStopBots">
+                        <span class="icon">⏹️</span> Stop Bots
+                    </button>
+                    <button class="bulk-action-btn danger" id="bulkDeleteChats">
+                        <span class="icon">🗑️</span> Delete
+                    </button>
+                </div>
+                
+                <button class="bulk-cancel-btn" id="bulkCancelBtn">
+                    Cancel
+                </button>
+            </div>
+
+            <!-- Loading State -->
+            <div id="loading" class="loading-state">
+                <div class="skeleton-grid">
+                    <div class="skeleton-card"></div>
+                    <div class="skeleton-card"></div>
+                    <div class="skeleton-card"></div>
+                </div>
+            </div>
+
+            <!-- Error State -->
+            <div id="error" class="error-state glass-card" style="display: none;">
+                <div class="error-icon">⚠️</div>
+                <p class="error-message"></p>
+            </div>
+
+            <!-- Empty State -->
+            <div id="no-chats" class="empty-state glass-card" style="display: none;">
+                <div class="empty-icon">💬</div>
+                <h3 class="empty-title">No Chats Yet</h3>
+                <p class="empty-text">Get started by syncing chats from WhatsApp or adding one manually. Use “Sync Chats” to add new chats from WhatsApp.</p>
+                <div class="empty-actions">
+                    <button class="action-btn primary" onclick="document.getElementById('syncChatsBtn').click()">
+                        <span class="btn-icon">🔄</span>
+                        <span class="btn-text">Sync Chats</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Table View Container -->
+            <div id="table-view-container" class="table-view-container" style="display: none;">
+                <div class="table-wrapper glass-card">
+                    <table class="chats-table" id="chatsTable">
+                        <thead>
+                            <tr>
+                                <th class="col-select">
+                                    <input type="checkbox" id="selectAllChats" class="chat-checkbox">
+                                </th>
+                                <th class="col-name sortable" data-sort="chat_name">
+                                    Chat Name <span class="sort-icon">↕️</span>
+                                </th>
+                                <th class="col-activity sortable active-sort" data-sort="last_message_time">
+                                    Last Activity <span class="sort-icon">↓</span>
+                                </th>
+                                <th class="col-messages sortable" data-sort="message_count">
+                                    Messages <span class="sort-icon">↕️</span>
+                                </th>
+                                <th class="col-bots">
+                                    Bots
+                                </th>
+                                <th class="col-status">
+                                    Status
+                                </th>
+                                <th class="col-actions">
+                                    Actions
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody id="chatsTableBody">
+                            <!-- Table rows will be inserted here dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Pagination Controls -->
+                <div class="pagination-controls glass-card" id="paginationControls">
+                    <div class="pagination-info">
+                        <span id="paginationInfo">Page 1 of 1</span>
+                    </div>
+                    
+                    <div class="pagination-buttons">
+                        <button class="pagination-btn" id="firstPageBtn" disabled>
+                            <span>««</span>
+                        </button>
+                        <button class="pagination-btn" id="prevPageBtn" disabled>
+                            <span>‹</span>
+                        </button>
+                        
+                        <div class="page-numbers" id="pageNumbers">
+                            <!-- Page numbers will be inserted here -->
+                        </div>
+                        
+                        <button class="pagination-btn" id="nextPageBtn">
+                            <span>›</span>
+                        </button>
+                        <button class="pagination-btn" id="lastPageBtn">
+                            <span>»»</span>
+                        </button>
+                    </div>
+                    
+                    <div class="pagination-size">
+                        <label>Per page:</label>
+                        <select class="per-page-select" id="perPageSelect">
+                            <option value="10">10</option>
+                            <option value="20" selected>20</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chats Container (Card View) -->
+            <div id="chats-container" class="chats-grid">
+                <!-- Chat cards will be inserted here dynamically -->
+            </div>
+        </section>
+    </main>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Mobile Bottom Nav -->
+    <nav class="bottom-nav">
+        <button class="bottom-nav-item active" data-view="dashboard">
+            <span class="nav-icon">📊</span>
+            <span class="nav-label">Dashboard</span>
+        </button>
+        <button class="bottom-nav-item" data-view="chats">
+            <span class="nav-icon">💬</span>
+            <span class="nav-label">Chats</span>
+        </button>
+        <button class="bottom-nav-item" data-view="bots">
+            <span class="nav-icon">🤖</span>
+            <span class="nav-label">Bots</span>
+        </button>
+    </nav>
+
+    <!-- Authentication check script - loaded first -->
+    <script src="check-auth.js?v=20250116"></script>
+    <!-- Main app script -->
+    <script src="app.js?v=20250116"></script>
+</body>
+</html>

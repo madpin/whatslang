@@ -1,0 +1,683 @@
+/* ===================================
+   MAGICAL PASSWORD PAGE STYLES
+   =================================== */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --primary: #6366f1;
+    --primary-light: #818cf8;
+    --primary-dark: #4f46e5;
+    --secondary: #8b5cf6;
+    --accent: #06b6d4;
+    --success: #10b981;
+    --danger: #ef4444;
+    --bg-dark: #0f172a;
+    --bg-darker: #020617;
+    --text-light: #f1f5f9;
+    --text-muted: #94a3b8;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg-darker);
+    color: var(--text-light);
+    min-height: 100vh;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ===================================
+   ANIMATED BACKGROUND
+   =================================== */
+
+.animated-bg {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    z-index: 1;
+}
+
+.gradient-orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    opacity: 0.3;
+    animation: floatOrb 20s ease-in-out infinite;
+}
+
+.orb-1 {
+    width: 500px;
+    height: 500px;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+    top: -250px;
+    left: -250px;
+    animation-delay: 0s;
+}
+
+.orb-2 {
+    width: 400px;
+    height: 400px;
+    background: linear-gradient(135deg, var(--secondary) 0%, var(--accent) 100%);
+    bottom: -200px;
+    right: -200px;
+    animation-delay: -7s;
+}
+
+.orb-3 {
+    width: 600px;
+    height: 600px;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--primary) 100%);
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    animation-delay: -14s;
+}
+
+@keyframes floatOrb {
+    0%, 100% {
+        transform: translate(0, 0) scale(1);
+    }
+    33% {
+        transform: translate(50px, -50px) scale(1.1);
+    }
+    66% {
+        transform: translate(-50px, 50px) scale(0.9);
+    }
+}
+
+/* Stars Background */
+.stars {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: 
+        radial-gradient(2px 2px at 20px 30px, white, transparent),
+        radial-gradient(2px 2px at 60px 70px, white, transparent),
+        radial-gradient(1px 1px at 50px 50px, white, transparent),
+        radial-gradient(1px 1px at 130px 80px, white, transparent),
+        radial-gradient(2px 2px at 90px 10px, white, transparent);
+    background-size: 200px 200px;
+    opacity: 0.5;
+    animation: twinkle 3s ease-in-out infinite;
+}
+
+@keyframes twinkle {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 0.8; }
+}
+
+/* ===================================
+   PARTICLE CANVAS
+   =================================== */
+
+#particles {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 2;
+    pointer-events: none;
+}
+
+/* ===================================
+   LOGIN CONTAINER
+   =================================== */
+
+.login-container {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2rem;
+    padding: 2rem;
+    animation: fadeInUp 1s ease-out;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ===================================
+   MAGIC CIRCLE
+   =================================== */
+
+.magic-circle {
+    position: absolute;
+    width: 500px;
+    height: 500px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 5;
+    pointer-events: none;
+}
+
+.circle-ring {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    border: 2px solid;
+    border-color: transparent var(--primary) transparent var(--secondary);
+    animation: rotateRing 8s linear infinite;
+}
+
+.ring-1 {
+    animation-duration: 8s;
+    opacity: 0.3;
+}
+
+.ring-2 {
+    width: 80%;
+    height: 80%;
+    top: 10%;
+    left: 10%;
+    animation-duration: 12s;
+    animation-direction: reverse;
+    opacity: 0.3;
+}
+
+.ring-3 {
+    width: 60%;
+    height: 60%;
+    top: 20%;
+    left: 20%;
+    animation-duration: 15s;
+    opacity: 0.3;
+}
+
+.circle-glow {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--primary) 0%, transparent 70%);
+    opacity: 0.1;
+    animation: pulse 4s ease-in-out infinite;
+}
+
+@keyframes rotateRing {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 0.1;
+    }
+    50% {
+        transform: scale(1.1);
+        opacity: 0.2;
+    }
+}
+
+/* ===================================
+   LOGIN CARD
+   =================================== */
+
+.login-card {
+    position: relative;
+    background: rgba(15, 23, 42, 0.7);
+    backdrop-filter: blur(30px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 2rem;
+    padding: 3rem 2.5rem;
+    width: 100%;
+    max-width: 450px;
+    box-shadow: 
+        0 20px 60px rgba(0, 0, 0, 0.5),
+        0 0 100px rgba(99, 102, 241, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    animation: cardFloat 6s ease-in-out infinite;
+}
+
+@keyframes cardFloat {
+    0%, 100% {
+        transform: translateY(0px);
+    }
+    50% {
+        transform: translateY(-10px);
+    }
+}
+
+/* ===================================
+   LOGO SECTION
+   =================================== */
+
+.logo-container {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.logo-icon {
+    margin-bottom: 1rem;
+    animation: iconBounce 2s ease-in-out infinite;
+}
+
+.emoji-float {
+    font-size: 4rem;
+    display: inline-block;
+    filter: drop-shadow(0 10px 20px rgba(99, 102, 241, 0.5));
+}
+
+@keyframes iconBounce {
+    0%, 100% {
+        transform: translateY(0) rotate(0deg);
+    }
+    25% {
+        transform: translateY(-10px) rotate(-5deg);
+    }
+    75% {
+        transform: translateY(-5px) rotate(5deg);
+    }
+}
+
+.app-name {
+    font-size: 2.5rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, #fff 0%, var(--primary) 50%, var(--secondary) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: 2px;
+    display: inline-block;
+}
+
+.letter {
+    display: inline-block;
+    animation: letterWave 2s ease-in-out infinite;
+    animation-delay: calc(var(--i) * 0.1s);
+}
+
+@keyframes letterWave {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-10px);
+    }
+}
+
+/* ===================================
+   SUBTITLE
+   =================================== */
+
+.subtitle {
+    text-align: center;
+    margin-bottom: 2.5rem;
+    font-size: 1.125rem;
+    color: var(--text-muted);
+    min-height: 1.5rem;
+}
+
+.typing-text {
+    font-weight: 500;
+}
+
+.cursor {
+    animation: blink 1s step-end infinite;
+    color: var(--primary);
+    font-weight: bold;
+}
+
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+}
+
+/* ===================================
+   PASSWORD FORM
+   =================================== */
+
+.password-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.input-group {
+    position: relative;
+}
+
+.input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.05);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 1rem;
+    padding: 0.75rem 1rem;
+    transition: all 0.3s ease;
+}
+
+.input-wrapper:focus-within {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--primary);
+    box-shadow: 0 0 30px rgba(99, 102, 241, 0.3);
+    transform: translateY(-2px);
+}
+
+.input-icon {
+    font-size: 1.5rem;
+    margin-right: 0.75rem;
+    animation: iconRotate 3s ease-in-out infinite;
+}
+
+@keyframes iconRotate {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(-10deg); }
+    75% { transform: rotate(10deg); }
+}
+
+#passwordInput {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text-light);
+    font-size: 1rem;
+    padding: 0.5rem 0;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+}
+
+#passwordInput::placeholder {
+    color: var(--text-muted);
+}
+
+.toggle-password {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.25rem;
+    transition: transform 0.3s ease;
+}
+
+.toggle-password:hover {
+    transform: scale(1.2);
+}
+
+.eye-icon {
+    font-size: 1.25rem;
+}
+
+.input-underline {
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--primary) 0%, var(--secondary) 100%);
+    transition: width 0.4s ease;
+}
+
+.input-wrapper:focus-within + .input-underline {
+    width: 100%;
+}
+
+/* ===================================
+   SUBMIT BUTTON
+   =================================== */
+
+.submit-btn {
+    position: relative;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+    border: none;
+    border-radius: 1rem;
+    padding: 1rem 2rem;
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: white;
+    cursor: pointer;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    box-shadow: 0 10px 30px rgba(99, 102, 241, 0.4);
+}
+
+.submit-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 15px 40px rgba(99, 102, 241, 0.6);
+}
+
+.submit-btn:active {
+    transform: translateY(-1px);
+}
+
+.btn-content {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.btn-icon {
+    font-size: 1.25rem;
+    animation: sparkle 2s ease-in-out infinite;
+}
+
+@keyframes sparkle {
+    0%, 100% {
+        transform: scale(1) rotate(0deg);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.2) rotate(180deg);
+        opacity: 0.8;
+    }
+}
+
+.btn-glow {
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    transition: left 0.5s ease;
+}
+
+.submit-btn:hover .btn-glow {
+    left: 100%;
+}
+
+/* ===================================
+   ERROR MESSAGE
+   =================================== */
+
+.error-message {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid var(--danger);
+    border-radius: 0.75rem;
+    color: var(--danger);
+    font-weight: 600;
+    animation: shake 0.5s ease;
+}
+
+.error-message.hidden {
+    display: none;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-10px); }
+    75% { transform: translateX(10px); }
+}
+
+.error-icon {
+    font-size: 1.25rem;
+    animation: errorPulse 1s ease-in-out infinite;
+}
+
+@keyframes errorPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.2); }
+}
+
+/* ===================================
+   FLOATING ELEMENTS
+   =================================== */
+
+.floating-elements {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    overflow: hidden;
+    border-radius: 2rem;
+}
+
+.float-emoji {
+    position: absolute;
+    font-size: 2rem;
+    opacity: 0.3;
+    animation: floatEmoji 3s ease-in-out infinite;
+    animation-delay: var(--delay);
+    top: 50%;
+    left: 50%;
+}
+
+@keyframes floatEmoji {
+    0%, 100% {
+        transform: translate(var(--x), var(--y)) rotate(0deg);
+        opacity: 0.3;
+    }
+    50% {
+        transform: translate(calc(var(--x) * -1), calc(var(--y) * -1)) rotate(180deg);
+        opacity: 0.6;
+    }
+}
+
+/* ===================================
+   FOOTER
+   =================================== */
+
+.footer {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    animation: fadeIn 2s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* ===================================
+   SUCCESS ANIMATION
+   =================================== */
+
+@keyframes successGlow {
+    0% {
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+    }
+    100% {
+        box-shadow: 0 0 0 30px rgba(16, 185, 129, 0);
+    }
+}
+
+.success-state {
+    animation: successGlow 0.6s ease-out;
+    border-color: var(--success) !important;
+}
+
+/* ===================================
+   LOADING ANIMATION
+   =================================== */
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.loading {
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+.loading .btn-icon {
+    animation: spin 1s linear infinite;
+}
+
+/* ===================================
+   RESPONSIVE DESIGN
+   =================================== */
+
+@media (max-width: 768px) {
+    .login-card {
+        padding: 2rem 1.5rem;
+        max-width: 350px;
+    }
+
+    .app-name {
+        font-size: 2rem;
+    }
+
+    .emoji-float {
+        font-size: 3rem;
+    }
+
+    .magic-circle {
+        width: 300px;
+        height: 300px;
+    }
+
+    .gradient-orb {
+        filter: blur(60px);
+    }
+}
+
+@media (max-width: 480px) {
+    .login-card {
+        padding: 1.5rem 1rem;
+        max-width: 320px;
+    }
+
+    .app-name {
+        font-size: 1.75rem;
+    }
+
+    .subtitle {
+        font-size: 1rem;
+    }
+
+    #passwordInput {
+        font-size: 0.875rem;
+    }
+
+    .submit-btn {
+        font-size: 1rem;
+        padding: 0.875rem 1.5rem;
+    }
+}
+

@@ -1,529 +1,650 @@
-# WhatSlang Deployment Guide
+# Deployment Guide
 
-This guide covers deploying WhatSlang to production, with specific instructions for Dokploy and other platforms.
+This guide covers various deployment scenarios for the WhatsApp Bot Service.
 
 ## Table of Contents
 
-- [Quick Start with Dokploy](#quick-start-with-dokploy)
-- [Database Options](#database-options)
-- [Environment Configuration](#environment-configuration)
-- [Docker Deployment](#docker-deployment)
-- [Health Checks & Monitoring](#health-checks--monitoring)
-- [Troubleshooting](#troubleshooting)
+- [Dokploy (Nixpacks)](#dokploy-nixpacks)
+- [Docker](#docker)
+- [Kubernetes](#kubernetes)
+- [Traditional VPS](#traditional-vps)
 
 ---
 
-## Quick Start with Dokploy
+## Dokploy (Nixpacks)
 
-Dokploy makes it easy to deploy WhatSlang using Docker Compose.
+Dokploy uses Nixpacks to automatically detect and build your application.
 
 ### Prerequisites
 
 - Dokploy instance running
-- Git repository with your WhatSlang code
-- WhatsApp API instance (go-whatsapp-web-multidevice)
-- OpenAI API key or compatible LLM endpoint
+- Git repository with your code
+- WhatsApp API endpoint accessible from your Dokploy instance
 
-### Step 1: Create a New Service in Dokploy
+### Step-by-Step Deployment
 
-1. Log in to your Dokploy dashboard
-2. Click **"Create Service"** or **"New Application"**
-3. Select **"Docker Compose"** as the deployment type
-4. Connect your Git repository
+#### 1. Prepare Your Repository
 
-### Step 2: Configure Environment Variables
+Ensure these files are in your repository:
+- `nixpacks.toml` - Nixpacks configuration
+- `requirements.txt` - Python dependencies
+- `api/`, `bots/`, `core/`, `frontend/` - Application code
 
-In Dokploy's environment variables section, add the following:
+#### 2. Create Application in Dokploy
 
-#### Required Variables
+1. Log into Dokploy dashboard
+2. Navigate to your project
+3. Click **"Add Service"** → **"Application"**
+4. Choose **"Git Provider"**
+5. Select your repository and branch
 
-```bash
-# WhatsApp API
-WHATSAPP_BASE_URL=https://your-whatsapp-api.example.com
-WHATSAPP_API_USER=your_username
-WHATSAPP_API_PASSWORD=your_password
+#### 3. Configure Build Settings
 
-# OpenAI/LLM
-OPENAI_API_KEY=sk-your-api-key-here
-OPENAI_MODEL=gpt-4o-mini
+Dokploy will automatically detect Nixpacks. Verify:
+- **Build Method**: Nixpacks (auto-detected)
+- **Port**: 8000
 
-# Database (if using PostgreSQL container)
-DB_PASSWORD=your_secure_database_password
-```
+#### 4. Set Environment Variables
 
-#### Optional Variables
+Add these in the "Environment" tab:
 
 ```bash
-# Custom LLM endpoint (e.g., LiteLLM, Azure OpenAI)
-OPENAI_BASE_URL=https://your-litellm-endpoint.com
+# Required
+WHATSAPP_BASE_URL=https://your-whatsapp-api.com
+WHATSAPP_API_USER=your-username
+WHATSAPP_API_PASSWORD=your-password
+CHAT_JID=your-chat-jid@g.us
 
-# Bot behavior tuning
-POLL_INTERVAL_SECONDS=5
-MESSAGE_LIMIT_PER_POLL=20
+OPENAI_API_KEY=sk-your-openai-key
+OPENAI_BASE_URL=https://api.openai.com/v1
+OPENAI_MODEL=gpt-4
 
-# Logging
+# Production settings
+ENVIRONMENT=production
 LOG_LEVEL=INFO
-DEBUG=false
 ```
 
-### Step 3: Choose Your Docker Compose File
+#### 5. Configure Persistent Storage
 
-Dokploy will automatically detect `docker-compose.yml` in your repository root.
+Add a volume mount:
+- **Mount Path**: `/data`
+- **Size**: 1GB (adjust based on usage)
+- **Purpose**: Persists SQLite database
 
-**For production deployment**, you can use the production override:
+#### 6. Configure Domain (Optional)
+
+In the "Domains" tab:
+- Add your custom domain
+- Enable SSL (Let's Encrypt)
+
+#### 7. Configure Health Checks
+
+In "Advanced" settings:
+
+**Liveness Probe:**
+- Path: `/health`
+- Port: 8000
+- Initial Delay: 30s
+- Period: 10s
+
+**Readiness Probe:**
+- Path: `/ready`
+- Port: 8000
+- Initial Delay: 10s
+- Period: 5s
+
+#### 8. Deploy
+
+Click **"Deploy"** button.
+
+Monitor deployment:
+- Watch build logs in real-time
+- First deployment takes 2-3 minutes
+- Subsequent deployments are faster (cached layers)
+
+#### 9. Verify Deployment
 
 ```bash
-docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# Check health
+curl https://your-domain.com/health
+
+# Check readiness
+curl https://your-domain.com/ready
+
+# Access dashboard
+open https://your-domain.com/static/index.html
 ```
 
-Or configure Dokploy to use both files in the deployment settings.
+### Dokploy Best Practices
 
-### Step 4: Deploy
-
-1. Click **"Deploy"** in Dokploy
-2. Wait for the build and deployment to complete (2-5 minutes)
-3. Check the logs to ensure all services started successfully
-
-### Step 5: Verify Deployment
-
-Once deployed, verify the services are running:
-
-1. **Backend Health Check**: `https://your-domain.com/health`
-   - Should return: `{"status":"healthy"}`
-
-2. **Frontend**: `https://your-domain.com`
-   - Should load the WhatSlang dashboard
-
-3. **API Documentation**: `https://your-domain.com/docs`
-   - Should show the interactive API documentation
-
-### Step 6: Configure Domain & SSL
-
-In Dokploy:
-
-1. Go to your service settings
-2. Add your custom domain
-3. Enable SSL/TLS (Dokploy handles Let's Encrypt automatically)
-4. Update your DNS records to point to your Dokploy server
+- **Environment Variables**: Use Dokploy's secret management
+- **Logs**: Access via Dokploy dashboard logs tab
+- **Scaling**: Adjust resources in "Resources" tab
+- **Backups**: Enable automatic volume backups
+- **Updates**: Push to Git → Dokploy auto-deploys
 
 ---
 
-## Database Options
+## Docker
 
-WhatSlang supports two database configurations for production:
+### Using Docker Compose (Recommended)
 
-### Option A: PostgreSQL Container (Recommended for Dokploy)
+#### 1. Create `docker-compose.yml`
 
-**Advantages:**
-- ✅ Simple setup - included in `docker-compose.yml`
-- ✅ Automatic backups via Docker volumes
-- ✅ No external dependencies
-- ✅ Works out-of-the-box with Dokploy
+Already included in the repository!
 
-**Configuration:**
-
-The default `docker-compose.yml` includes a PostgreSQL container. Just set the `DB_PASSWORD` environment variable:
+#### 2. Create `.env` file
 
 ```bash
-DB_PASSWORD=your_secure_password_here
+cp env.example .env
+# Edit with your credentials
 ```
 
-The database URL is automatically configured:
-```bash
-DATABASE_URL=postgresql://whatslang:${DB_PASSWORD}@postgres:5432/whatslang
-```
-
-**Data Persistence:**
-
-Data is stored in a Docker volume named `postgres_data`. To back up:
+#### 3. Start Services
 
 ```bash
-# Backup
-docker exec whatslang-db pg_dump -U whatslang whatslang > backup.sql
-
-# Restore
-docker exec -i whatslang-db psql -U whatslang whatslang < backup.sql
+docker-compose up -d
 ```
 
-### Option B: External Managed Database
-
-**Advantages:**
-- ✅ Better for high-traffic production
-- ✅ Managed backups and scaling
-- ✅ High availability options
-- ✅ Separate from application lifecycle
-
-**Supported Providers:**
-- AWS RDS PostgreSQL
-- Google Cloud SQL
-- Azure Database for PostgreSQL
-- DigitalOcean Managed Databases
-- Supabase
-- Neon
-- Any PostgreSQL 15+ instance
-
-**Configuration:**
-
-1. Create a PostgreSQL database on your provider
-2. Get the connection string
-3. Set the `DATABASE_URL` environment variable:
+#### 4. Manage
 
 ```bash
-DATABASE_URL=postgresql://username:password@host:5432/database
+# View logs
+docker-compose logs -f whatslang
+
+# Stop
+docker-compose down
+
+# Restart
+docker-compose restart
+
+# Update
+git pull
+docker-compose up -d --build
 ```
 
-4. **Important**: If using an external database, you need to modify `docker-compose.yml` to remove the `postgres` service dependency:
+### Using Docker CLI
 
-In `docker-compose.yml`, update the backend service:
+#### 1. Build Image
+
+```bash
+docker build -t whatslang:latest .
+```
+
+#### 2. Run Container
+
+```bash
+docker run -d \
+  --name whatslang \
+  --restart unless-stopped \
+  -p 8000:8000 \
+  -e WHATSAPP_BASE_URL=https://your-api.com \
+  -e WHATSAPP_API_USER=your-user \
+  -e WHATSAPP_API_PASSWORD=your-pass \
+  -e CHAT_JID=your-jid@g.us \
+  -e OPENAI_API_KEY=sk-your-key \
+  -e ENVIRONMENT=production \
+  -v whatslang-data:/data \
+  whatslang:latest
+```
+
+#### 3. Manage
+
+```bash
+# View logs
+docker logs -f whatslang
+
+# Stop
+docker stop whatslang
+
+# Start
+docker start whatslang
+
+# Restart
+docker restart whatslang
+
+# Update
+docker stop whatslang
+docker rm whatslang
+docker pull whatslang:latest  # If using registry
+docker run ...  # Same command as step 2
+```
+
+---
+
+## Kubernetes
+
+### Prerequisites
+
+- Kubernetes cluster (1.20+)
+- kubectl configured
+- Persistent volume provisioner
+
+### Deployment
+
+#### 1. Create Namespace
+
+```bash
+kubectl create namespace whatslang
+```
+
+#### 2. Create Secret
+
+```bash
+kubectl create secret generic whatslang-secrets \
+  --namespace=whatslang \
+  --from-literal=WHATSAPP_BASE_URL=https://your-api.com \
+  --from-literal=WHATSAPP_API_USER=your-user \
+  --from-literal=WHATSAPP_API_PASSWORD=your-pass \
+  --from-literal=CHAT_JID=your-jid@g.us \
+  --from-literal=OPENAI_API_KEY=sk-your-key
+```
+
+#### 3. Create Deployment
+
+Create `k8s/deployment.yaml`:
 
 ```yaml
-backend:
-  # Remove or comment out:
-  # depends_on:
-  #   postgres:
-  #     condition: service_healthy
-  
-  environment:
-    DATABASE_URL: ${DATABASE_URL}  # Use external database
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: whatslang
+  namespace: whatslang
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: whatslang
+  template:
+    metadata:
+      labels:
+        app: whatslang
+    spec:
+      containers:
+      - name: whatslang
+        image: your-registry/whatslang:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: ENVIRONMENT
+          value: "production"
+        - name: LOG_LEVEL
+          value: "INFO"
+        envFrom:
+        - secretRef:
+            name: whatslang-secrets
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: whatslang-data
 ```
 
-And comment out or remove the entire `postgres` service section.
+#### 4. Create PVC
+
+Create `k8s/pvc.yaml`:
+
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: whatslang-data
+  namespace: whatslang
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+```
+
+#### 5. Create Service
+
+Create `k8s/service.yaml`:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: whatslang
+  namespace: whatslang
+spec:
+  selector:
+    app: whatslang
+  ports:
+  - port: 80
+    targetPort: 8000
+  type: ClusterIP
+```
+
+#### 6. Create Ingress (Optional)
+
+Create `k8s/ingress.yaml`:
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: whatslang
+  namespace: whatslang
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  tls:
+  - hosts:
+    - whatslang.yourdomain.com
+    secretName: whatslang-tls
+  rules:
+  - host: whatslang.yourdomain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: whatslang
+            port:
+              number: 80
+```
+
+#### 7. Apply Configuration
+
+```bash
+kubectl apply -f k8s/
+```
+
+#### 8. Verify
+
+```bash
+# Check deployment
+kubectl get deployments -n whatslang
+
+# Check pods
+kubectl get pods -n whatslang
+
+# Check logs
+kubectl logs -n whatslang -l app=whatslang -f
+
+# Port forward for testing
+kubectl port-forward -n whatslang svc/whatslang 8000:80
+```
 
 ---
 
-## Environment Configuration
+## Traditional VPS
 
-### Complete Environment Variables Reference
+Deploy on Ubuntu/Debian server.
 
-Create a `.env` file based on `.env.example`:
+### Prerequisites
+
+- Ubuntu 20.04+ or Debian 11+
+- Root or sudo access
+- Domain name pointed to server IP (optional)
+
+### Installation
+
+#### 1. Update System
 
 ```bash
-# Copy the example file
-cp .env.example .env
-
-# Edit with your values
-nano .env  # or vim, code, etc.
+sudo apt update && sudo apt upgrade -y
 ```
 
-#### Application Settings
+#### 2. Install Python 3.11
 
 ```bash
-APP_NAME=WhatSlang
-DEBUG=false                    # Set to true only for debugging
-LOG_LEVEL=INFO                 # DEBUG, INFO, WARNING, ERROR, CRITICAL
+sudo apt install -y python3.11 python3.11-venv python3-pip
 ```
 
-#### Database Configuration
+#### 3. Clone Repository
 
 ```bash
-# For PostgreSQL container (default):
-DATABASE_URL=postgresql://whatslang:${DB_PASSWORD}@postgres:5432/whatslang
-DB_PASSWORD=your_secure_password
-
-# For external PostgreSQL:
-DATABASE_URL=postgresql://user:pass@host:5432/dbname
-
-# For local development (SQLite):
-DATABASE_URL=sqlite+aiosqlite:///./whatslang.db
-```
-
-#### WhatsApp API
-
-```bash
-WHATSAPP_BASE_URL=https://your-whatsapp-api.example.com
-WHATSAPP_API_USER=your_username        # Optional, if API requires auth
-WHATSAPP_API_PASSWORD=your_password    # Optional, if API requires auth
-```
-
-#### OpenAI / LLM
-
-```bash
-OPENAI_API_KEY=sk-your-key-here
-OPENAI_BASE_URL=                       # Optional: custom endpoint
-OPENAI_MODEL=gpt-4o-mini              # Or gpt-4, gpt-3.5-turbo, etc.
-```
-
-#### Bot Behavior
-
-```bash
-POLL_INTERVAL_SECONDS=5               # How often to check for new messages
-MESSAGE_LIMIT_PER_POLL=20             # Max messages per poll
-```
-
-#### Server Settings
-
-```bash
-HOST=0.0.0.0                          # Don't change for Docker
-PORT=8000                             # Backend port
-RELOAD=false                          # Set to true only for development
-```
-
----
-
-## Docker Deployment
-
-### Using Docker Compose (Standard)
-
-```bash
-# 1. Clone the repository
-git clone <your-repo-url>
+cd /opt
+sudo git clone https://github.com/yourusername/whatslang.git
 cd whatslang
-
-# 2. Create and configure .env file
-cp .env.example .env
-nano .env  # Add your credentials
-
-# 3. Start all services
-docker-compose up -d
-
-# 4. Check logs
-docker-compose logs -f backend
-
-# 5. Verify health
-curl http://localhost:8000/health
 ```
 
-### Using Docker Compose (Production)
-
-For production with optimized settings:
+#### 4. Create Virtual Environment
 
 ```bash
-# Use production overrides
-docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+sudo python3.11 -m venv .venv
+sudo .venv/bin/pip install -r requirements.txt
 ```
 
-The production configuration includes:
-- No volume mounts for code (uses built image)
-- Proper restart policies
-- Optimized resource limits
-- Production-ready settings
-
-### Port Mappings
-
-Default ports:
-- **Frontend**: `3000` → Nginx serving React app
-- **Backend**: `8000` → FastAPI application
-- **PostgreSQL**: `5432` → Database (only if using container)
-
-To change ports, modify `docker-compose.yml` or use environment variables.
-
-### Updating the Deployment
+#### 5. Configure Environment
 
 ```bash
-# Pull latest changes
-git pull
-
-# Rebuild and restart
-docker-compose up -d --build
-
-# Or with production config:
-docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+sudo cp env.example .env
+sudo nano .env
+# Fill in your credentials
 ```
 
----
+#### 6. Create Systemd Service
 
-## Health Checks & Monitoring
+Create `/etc/systemd/system/whatslang.service`:
 
-### Built-in Health Checks
+```ini
+[Unit]
+Description=WhatsApp Bot Service
+After=network.target
 
-**Backend Health Check:**
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/whatslang
+Environment="PATH=/opt/whatslang/.venv/bin"
+EnvironmentFile=/opt/whatslang/.env
+ExecStart=/opt/whatslang/.venv/bin/uvicorn api.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+#### 7. Set Permissions
+
 ```bash
-curl http://your-domain.com/health
+sudo chown -R www-data:www-data /opt/whatslang
+sudo chmod 600 /opt/whatslang/.env
 ```
 
-Expected response:
-```json
-{
-  "status": "healthy",
-  "app": "WhatSlang",
-  "version": "0.1.0"
+#### 8. Start Service
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable whatslang
+sudo systemctl start whatslang
+```
+
+#### 9. Check Status
+
+```bash
+sudo systemctl status whatslang
+sudo journalctl -u whatslang -f
+```
+
+### Nginx Reverse Proxy (Optional)
+
+#### 1. Install Nginx
+
+```bash
+sudo apt install -y nginx
+```
+
+#### 2. Configure
+
+Create `/etc/nginx/sites-available/whatslang`:
+
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;
+
+    location / {
+        proxy_pass http://localhost:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
 }
 ```
 
-**Frontend Health:**
-- Access `http://your-domain.com`
-- Check for "🟢 Online" indicator in top-right corner
-
-### Docker Health Checks
-
-The containers include built-in health checks:
+#### 3. Enable Site
 
 ```bash
-# Check container health
-docker ps
-
-# Backend should show "healthy" status
-# PostgreSQL should show "healthy" status
+sudo ln -s /etc/nginx/sites-available/whatslang /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl restart nginx
 ```
 
-### Monitoring Logs
+#### 4. SSL with Certbot (Optional)
 
 ```bash
-# All services
-docker-compose logs -f
-
-# Backend only
-docker-compose logs -f backend
-
-# Last 100 lines
-docker-compose logs --tail=100 backend
-
-# PostgreSQL
-docker-compose logs -f postgres
+sudo apt install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d your-domain.com
 ```
 
-### Common Health Check Issues
+### Maintenance
 
-**Backend shows unhealthy:**
-1. Check environment variables are set correctly
-2. Verify database connection: `docker-compose logs postgres`
-3. Check WhatsApp API is accessible
-4. Review backend logs: `docker-compose logs backend`
+```bash
+# View logs
+sudo journalctl -u whatslang -f
 
-**Frontend shows "🔴 Offline":**
-1. Backend is not running or not accessible
-2. Check backend health endpoint
-3. Verify network configuration in `docker-compose.yml`
+# Restart service
+sudo systemctl restart whatslang
+
+# Update application
+cd /opt/whatslang
+sudo git pull
+sudo .venv/bin/pip install -r requirements.txt
+sudo systemctl restart whatslang
+
+# Check service status
+sudo systemctl status whatslang
+```
+
+---
+
+## Security Considerations
+
+### All Deployments
+
+1. **Environment Variables**: Never commit `.env` file
+2. **API Keys**: Rotate regularly
+3. **HTTPS**: Always use SSL in production
+4. **Firewall**: Only open necessary ports
+5. **Updates**: Keep dependencies updated
+
+### Docker Specific
+
+- Run as non-root user (already configured)
+- Use read-only filesystem where possible
+- Scan images for vulnerabilities
+
+### Kubernetes Specific
+
+- Use Network Policies
+- Enable RBAC
+- Use Pod Security Standards
+- Implement resource quotas
+
+---
+
+## Monitoring
+
+### Health Endpoints
+
+```bash
+# Liveness (is it running?)
+curl http://your-service/health
+
+# Readiness (is it ready?)
+curl http://your-service/ready
+```
+
+### Logs
+
+- **Docker**: `docker logs -f whatslang`
+- **Kubernetes**: `kubectl logs -f -l app=whatslang`
+- **Systemd**: `journalctl -u whatslang -f`
+
+### Metrics
+
+The `/ready` endpoint provides operational metrics:
+
+```json
+{
+  "status": "ready",
+  "services": {
+    "whatsapp": "connected",
+    "llm": "connected",
+    "database": "connected"
+  },
+  "bots": {
+    "available": 2,
+    "running": 1
+  }
+}
+```
 
 ---
 
 ## Troubleshooting
 
-### Database Connection Issues
+### Common Issues
 
-**Error: "could not connect to server"**
+**Service won't start**
+- Check environment variables are set
+- Verify all required vars in `.env` or secrets
+- Check logs for specific error messages
 
-```bash
-# Check if PostgreSQL is running
-docker-compose ps postgres
+**Database errors**
+- Ensure `/data` directory is writable
+- Check persistent volume is mounted
+- Verify file permissions
 
-# Check PostgreSQL logs
-docker-compose logs postgres
+**WhatsApp API connection fails**
+- Test API endpoint accessibility
+- Verify credentials
+- Check firewall rules
 
-# Verify DATABASE_URL is correct
-docker-compose exec backend env | grep DATABASE_URL
-```
-
-**Solution:**
-- Ensure `DB_PASSWORD` matches in both backend and postgres services
-- Wait for PostgreSQL to be fully ready (health check)
-- Check network connectivity between containers
-
-### WhatsApp API Connection Issues
-
-**Error: "Failed to fetch messages from WhatsApp API"**
-
-```bash
-# Test WhatsApp API from backend container
-docker-compose exec backend curl $WHATSAPP_BASE_URL/health
-
-# Check environment variables
-docker-compose exec backend env | grep WHATSAPP
-```
-
-**Solution:**
-- Verify `WHATSAPP_BASE_URL` is accessible from the container
-- Check authentication credentials if required
-- Ensure WhatsApp API is running and healthy
-
-### OpenAI API Issues
-
-**Error: "Invalid API key" or "Rate limit exceeded"**
-
-```bash
-# Verify API key is set
-docker-compose exec backend env | grep OPENAI_API_KEY
-```
-
-**Solution:**
-- Check API key is valid and has credits
-- Verify `OPENAI_BASE_URL` if using custom endpoint
-- Check rate limits on your OpenAI account
-
-### Port Conflicts
-
-**Error: "port is already allocated"**
-
-```bash
-# Check what's using the port
-lsof -i :8000  # or :3000, :5432
-
-# Kill the process or change ports in docker-compose.yml
-```
-
-**Solution:**
-- Stop conflicting services
-- Or modify port mappings in `docker-compose.yml`
-
-### Container Won't Start
-
-```bash
-# Check container status
-docker-compose ps
-
-# View detailed logs
-docker-compose logs backend
-
-# Restart specific service
-docker-compose restart backend
-
-# Full restart
-docker-compose down
-docker-compose up -d
-```
-
-### Database Migration Issues
-
-**Error: "relation does not exist"**
-
-The database needs to be initialized:
-
-```bash
-# Run migrations manually
-docker-compose exec backend python run_migrations.py
-
-# Or restart backend (migrations run on startup)
-docker-compose restart backend
-```
-
-### Out of Memory / Resource Issues
-
-```bash
-# Check container resource usage
-docker stats
-
-# Increase Docker resources in Docker Desktop settings
-# Or add resource limits in docker-compose.yml
-```
+**LLM errors**
+- Validate API key
+- Test endpoint connectivity
+- Verify model name
 
 ---
 
-## Production Checklist
+## Support
 
-Before going live, verify:
-
-- [ ] All environment variables are set correctly
-- [ ] Database is using PostgreSQL (not SQLite)
-- [ ] Strong database password is set
-- [ ] SSL/TLS is enabled (HTTPS)
-- [ ] Domain is configured correctly
-- [ ] Health checks are passing
-- [ ] Logs are being collected
-- [ ] Backups are configured (database)
-- [ ] WhatsApp API is accessible
-- [ ] OpenAI API key is valid and has credits
-- [ ] Frontend loads correctly
-- [ ] API documentation is accessible
-- [ ] Test bot is working in a chat
-
----
-
-## Support & Additional Resources
-
-- **Main Documentation**: See `README.md`
-- **Frontend Guide**: See `docs/QUICK_START_FRONTEND.md`
-- **Development Guide**: See `docs/DEVELOPMENT.md`
-- **API Documentation**: `https://your-domain.com/docs`
-
-For issues and questions, please open a GitHub issue.
+- Documentation: See [README.md](../README.md)
+- Issues: GitHub Issues
+- Community: GitHub Discussions
 
