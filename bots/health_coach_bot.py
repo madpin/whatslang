@@ -75,9 +75,7 @@ class HealthCoachBot(BotBase):
 
         if media_type and "image" in str(media_type).lower():
             return self._process_image_message(message)
-        if media_type and any(
-            x in str(media_type).lower() for x in ["audio", "voice", "ptt"]
-        ):
+        if media_type and any(x in str(media_type).lower() for x in ["audio", "voice", "ptt"]):
             return self._process_audio_message(message)
         if media_type and "video" in str(media_type).lower():
             return self._process_video_message(message)
