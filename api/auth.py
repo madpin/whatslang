@@ -4,9 +4,10 @@ Authentication API for password-protected access
 
 import os
 import secrets
+from typing import Optional
+
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
-from typing import Optional
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 

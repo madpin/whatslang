@@ -1,8 +1,8 @@
 """WhatsApp API client for sending and receiving messages."""
 
 import logging
-from typing import Optional, Dict, Any, List
 import time
+from typing import Any, Dict, List, Optional
 
 import requests
 
@@ -168,7 +168,7 @@ class WhatsAppClient:
 
             # Check for success response (could be code: 200 or code: "SUCCESS")
             if data.get("code") in [200, "SUCCESS"]:
-                logger.info(f"Message sent successfully")
+                logger.info("Message sent successfully")
                 return True
             else:
                 logger.error(f"Failed to send message: {data}")
@@ -404,7 +404,7 @@ class WhatsAppClient:
             logger.info(f"POST /group response: {str(data)[:300]}")
 
             if data.get("code") == "SUCCESS" and "results" in data:
-                logger.info(f"✓ Fetched group info from POST /group")
+                logger.info("✓ Fetched group info from POST /group")
                 return data["results"]
         except Exception as e:
             logger.debug(f"POST /group failed: {e}")

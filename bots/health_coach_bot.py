@@ -1,7 +1,7 @@
 """Health coach bot: empathic-but-honest coach with kcal estimation for food images."""
 
 import logging
-from typing import Dict, Any, Optional, List
+from typing import Any, Dict, List, Optional
 
 from core.bot_base import BotBase
 

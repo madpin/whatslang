@@ -3,9 +3,9 @@ Authentication middleware for API endpoints
 """
 
 import os
-from typing import Optional
-from fastapi import HTTPException, status, Request
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
+from fastapi import HTTPException, Request, status
+from fastapi.security import HTTPBearer
 
 # Simple bearer token security scheme
 security = HTTPBearer(auto_error=False)

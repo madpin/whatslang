@@ -2,18 +2,18 @@
 
 import importlib
 import logging
+import sys
 import threading
 import time
 from collections import deque
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Type, Tuple
-import sys
+from typing import Dict, List, Optional, Tuple, Type
 
 from core.bot_base import BotBase
-from core.whatsapp_client import WhatsAppClient
-from core.llm_service import LLMService
 from core.database import MessageDatabase
+from core.llm_service import LLMService
+from core.whatsapp_client import WhatsAppClient
 
 logger = logging.getLogger(__name__)
 
@@ -134,7 +134,7 @@ class BotManager:
     def get_all_bot_statuses(self) -> List[Dict]:
         """Get status of all running bot instances."""
         statuses = []
-        for bot_name, chat_jid in self.bots.keys():
+        for bot_name, chat_jid in self.bots:
             status = self.get_bot_status(bot_name, chat_jid)
             if status:
                 statuses.append(status)
@@ -143,7 +143,7 @@ class BotManager:
     def get_bot_statuses_for_chat(self, chat_jid: str) -> List[Dict]:
         """Get status of all bots (both available and running) for a specific chat."""
         statuses = []
-        for bot_name in self.bot_classes.keys():
+        for bot_name in self.bot_classes:
             status = self.get_bot_status(bot_name, chat_jid)
             if status:
                 statuses.append(status)

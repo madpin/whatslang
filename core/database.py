@@ -1,10 +1,11 @@
 """Database for tracking processed messages and managing chats/bot assignments."""
 
-import sqlite3
+import contextlib
 import logging
-from pathlib import Path
-from typing import Dict, List, Optional, Any
+import sqlite3
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -50,19 +51,14 @@ class MessageDatabase:
         """)
 
         # Add columns if they don't exist (for existing databases)
-        try:
+        with contextlib.suppress(sqlite3.OperationalError):
             cursor.execute("ALTER TABLE chats ADD COLUMN last_message_time TIMESTAMP")
-        except sqlite3.OperationalError:
-            pass  # Column already exists
-
-        try:
+        with contextlib.suppress(sqlite3.OperationalError):
             cursor.execute("ALTER TABLE chats ADD COLUMN message_count INTEGER DEFAULT 0")
-        except sqlite3.OperationalError:
-            pass  # Column already exists
 
         # Create index for faster sorting
         cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_chats_last_message_time 
+            CREATE INDEX IF NOT EXISTS idx_chats_last_message_time
             ON chats(last_message_time DESC)
         """)
 
@@ -138,7 +134,7 @@ class MessageDatabase:
         cursor = conn.cursor()
         cursor.execute(
             """
-            INSERT INTO processed_messages 
+            INSERT INTO processed_messages
             (message_id, bot_name, original_text, response_text, metadata)
             VALUES (?, ?, ?, ?, ?)
         """,
@@ -215,10 +211,7 @@ class MessageDatabase:
 
         # Build query with filters
         # Use DISTINCT when filtering by bot status to avoid duplicates from JOIN
-        if bot_status_filter:
-            query = "SELECT DISTINCT chats.* FROM chats"
-        else:
-            query = "SELECT * FROM chats"
+        query = "SELECT DISTINCT chats.* FROM chats" if bot_status_filter else "SELECT * FROM chats"
 
         # Bot status filter requires a JOIN
         if bot_status_filter == "running":
@@ -429,7 +422,7 @@ class MessageDatabase:
             # Try to update existing assignment
             cursor.execute(
                 """
-                UPDATE bot_chat_assignments 
+                UPDATE bot_chat_assignments
                 SET running = ?
                 WHERE bot_name = ? AND chat_jid = ?
             """,
@@ -465,7 +458,7 @@ class MessageDatabase:
             # Try to update existing assignment
             cursor.execute(
                 """
-                UPDATE bot_chat_assignments 
+                UPDATE bot_chat_assignments
                 SET answer_owner_messages = ?
                 WHERE bot_name = ? AND chat_jid = ?
             """,
@@ -510,7 +503,7 @@ class MessageDatabase:
             # Try to update existing assignment
             cursor.execute(
                 """
-                UPDATE bot_chat_assignments 
+                UPDATE bot_chat_assignments
                 SET context_message_count = ?
                 WHERE bot_name = ? AND chat_jid = ?
             """,
@@ -551,7 +544,7 @@ class MessageDatabase:
         cursor = conn.cursor()
         cursor.execute(
             """
-            SELECT * FROM bot_chat_assignments 
+            SELECT * FROM bot_chat_assignments
             WHERE bot_name = ? AND chat_jid = ?
         """,
             (bot_name, chat_jid),
@@ -574,7 +567,7 @@ class MessageDatabase:
         cursor = conn.cursor()
         cursor.execute(
             """
-            SELECT bot_name FROM bot_chat_assignments 
+            SELECT bot_name FROM bot_chat_assignments
             WHERE chat_jid = ? AND running = 1
         """,
             (chat_jid,),
@@ -589,7 +582,7 @@ class MessageDatabase:
         cursor = conn.cursor()
         cursor.execute(
             """
-            SELECT chat_jid FROM bot_chat_assignments 
+            SELECT chat_jid FROM bot_chat_assignments
             WHERE bot_name = ? AND running = 1
         """,
             (bot_name,),
@@ -605,7 +598,7 @@ class MessageDatabase:
         cursor = conn.cursor()
         cursor.execute(
             """
-            SELECT * FROM bot_chat_assignments 
+            SELECT * FROM bot_chat_assignments
             WHERE chat_jid = ?
             ORDER BY bot_name
         """,
@@ -622,7 +615,7 @@ class MessageDatabase:
         cursor = conn.cursor()
         cursor.execute(
             """
-            SELECT * FROM bot_chat_assignments 
+            SELECT * FROM bot_chat_assignments
             WHERE bot_name = ?
             ORDER BY chat_jid
         """,
@@ -639,7 +632,7 @@ class MessageDatabase:
             cursor = conn.cursor()
             cursor.execute(
                 """
-                DELETE FROM bot_chat_assignments 
+                DELETE FROM bot_chat_assignments
                 WHERE bot_name = ? AND chat_jid = ?
             """,
                 (bot_name, chat_jid),

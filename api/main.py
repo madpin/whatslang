@@ -16,21 +16,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
+from api import auth
 from api.bot_manager import BotManager
 from api.models import (
-    BotStatus,
+    AddChatRequest,
     BotLogsResponse,
-    ErrorResponse,
-    SuccessResponse,
+    BotStatus,
     Chat,
     ChatWithBots,
-    BotAssignment,
-    AddChatRequest,
+    SuccessResponse,
 )
-from api import auth
-from core.whatsapp_client import WhatsAppClient
-from core.llm_service import LLMService
 from core.database import MessageDatabase
+from core.llm_service import LLMService
+from core.whatsapp_client import WhatsAppClient
 
 # Load environment variables from .env file
 load_dotenv()
@@ -295,13 +293,12 @@ async def protect_api_endpoints(request: Request, call_next):
         is_public = any(request.url.path == public_path for public_path in public_paths)
 
         # If not public and password is set, require authentication
-        if not is_public:
-            if not await AuthMiddleware.verify_token(request):
-                return JSONResponse(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    content={"detail": "Authentication required"},
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
+        if not is_public and not await AuthMiddleware.verify_token(request):
+            return JSONResponse(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                content={"detail": "Authentication required"},
+                headers={"WWW-Authenticate": "Bearer"},
+            )
 
     # Process request
     response = await call_next(request)
@@ -435,7 +432,7 @@ async def readiness_check():
         logger.error(f"Readiness check failed: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=f"Service not ready: {str(e)}"
-        )
+        ) from e
 
 
 @app.get("/bots", response_model=List[BotStatus])
@@ -446,7 +443,7 @@ async def list_bots():
         return statuses
     except Exception as e:
         logger.error(f"Error listing bots: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 # ===== Chat Management Endpoints =====
@@ -489,7 +486,7 @@ async def get_stats():
         }
     except Exception as e:
         logger.error(f"Error getting stats: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.get("/chats")
@@ -595,7 +592,7 @@ async def list_chats(
         }
     except Exception as e:
         logger.error(f"Error listing chats: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/chats/sync", response_model=SuccessResponse)
@@ -699,7 +696,7 @@ async def sync_chats():
         )
     except Exception as e:
         logger.error(f"Error syncing chats: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/chats", response_model=Chat)
@@ -741,7 +738,7 @@ async def add_chat(request: AddChatRequest):
         raise
     except Exception as e:
         logger.error(f"Error adding chat: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.get("/chats/{chat_jid}", response_model=ChatWithBots)
@@ -766,7 +763,7 @@ async def get_chat(chat_jid: str):
         raise
     except Exception as e:
         logger.error(f"Error getting chat: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.get("/chats/{chat_jid}/messages")
@@ -781,7 +778,7 @@ async def get_chat_messages(chat_jid: str, limit: int = 20):
         }
     except Exception as e:
         logger.error(f"Error fetching messages for chat {chat_jid}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.delete("/chats/{chat_jid}", response_model=SuccessResponse)
@@ -804,7 +801,7 @@ async def delete_chat(chat_jid: str):
         raise
     except Exception as e:
         logger.error(f"Error deleting chat: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/chats/bulk-action")
@@ -866,7 +863,7 @@ async def bulk_action_chats(chat_jids: List[str], action: str, bot_name: Optiona
 
     except Exception as e:
         logger.error(f"Error in bulk action: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 # ===== Assignment Management Endpoints =====
@@ -880,7 +877,7 @@ async def list_bots_for_chat(chat_jid: str):
         return statuses
     except Exception as e:
         logger.error(f"Error listing bots for chat: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.get("/bots/{bot_name}/chats", response_model=List[Chat])
@@ -903,7 +900,7 @@ async def list_chats_for_bot(bot_name: str):
         raise
     except Exception as e:
         logger.error(f"Error listing chats for bot: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 # ===== Bot Control Endpoints (Updated for Multi-Chat) =====
@@ -921,7 +918,7 @@ async def get_bot_status_legacy(bot_name: str, chat_jid: str):
         raise
     except Exception as e:
         logger.error(f"Error getting bot status: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/bots/{bot_name}/start", response_model=SuccessResponse)
@@ -937,7 +934,7 @@ async def start_bot(bot_name: str, chat_jid: str):
         raise
     except Exception as e:
         logger.error(f"Error starting bot: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/bots/{bot_name}/stop", response_model=SuccessResponse)
@@ -954,7 +951,7 @@ async def stop_bot(bot_name: str, chat_jid: str):
         raise
     except Exception as e:
         logger.error(f"Error stopping bot: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.get("/bots/{bot_name}/logs", response_model=BotLogsResponse)
@@ -965,7 +962,7 @@ async def get_bot_logs(bot_name: str, chat_jid: str, limit: int = 50):
         return BotLogsResponse(bot_name=bot_name, chat_jid=chat_jid, logs=logs)
     except Exception as e:
         logger.error(f"Error getting bot logs: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/bots/{bot_name}/settings", response_model=SuccessResponse)
@@ -1018,7 +1015,7 @@ async def update_bot_settings(
         raise
     except Exception as e:
         logger.error(f"Error updating bot settings: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.put("/bots/{bot_name}/chats/{chat_jid}/context", response_model=SuccessResponse)
@@ -1059,7 +1056,7 @@ async def set_bot_context(bot_name: str, chat_jid: str, count: int):
         raise
     except Exception as e:
         logger.error(f"Error setting bot context: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.get("/bots/{bot_name}/chats/{chat_jid}/context")
@@ -1084,7 +1081,7 @@ async def get_bot_context(bot_name: str, chat_jid: str):
         raise
     except Exception as e:
         logger.error(f"Error getting bot context: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 if __name__ == "__main__":

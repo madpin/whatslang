@@ -1,15 +1,13 @@
 """Base class for all WhatsApp bots."""
 
-import time
 import logging
-import signal
+import time
 from abc import ABC, abstractmethod
-from typing import Dict, Any, List, Optional
-from pathlib import Path
+from typing import Any, Dict, List, Optional
 
-from core.whatsapp_client import WhatsAppClient
 from core.database import MessageDatabase
 from core.llm_service import LLMService
+from core.whatsapp_client import WhatsAppClient
 
 logger = logging.getLogger(__name__)
 

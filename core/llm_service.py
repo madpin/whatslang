@@ -7,7 +7,7 @@ import os
 import random
 import tempfile
 import time
-from typing import Optional, Dict, Any, List
+from typing import Any, Dict, List, Optional
 
 import ffmpeg
 from openai import OpenAI
@@ -96,10 +96,7 @@ class LLMService:
                 is_bot = msg.get("is_bot", False)
                 is_from_me = msg.get("is_from_me", False)
 
-                if is_bot or is_from_me:
-                    role = "assistant"
-                else:
-                    role = "user"
+                role = "assistant" if is_bot or is_from_me else "user"
 
                 sender = msg.get("sender", "Unknown")
                 # Format with sender info for context
@@ -315,7 +312,7 @@ class LLMService:
         else:
             # Default to ogg (common for WhatsApp voice messages)
             audio_format = "ogg"
-            logger.warning(f"Could not detect audio format, defaulting to ogg")
+            logger.warning("Could not detect audio format, defaulting to ogg")
 
         logger.info(f"Detected audio format: {audio_format}, size: {len(audio_bytes)} bytes")
 
