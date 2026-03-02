@@ -592,12 +592,12 @@ async def sync_chats():
         logger.info("STARTING CHAT SYNC")
         logger.info("=" * 60)
         logger.info("Step 1: Fetching groups from /user/my/groups")
-        groups = whatsapp_client.get_groups()
+        groups = whatsapp_client.get_groups(fetch_all=True)
         logger.info(f"✓ Retrieved {len(groups)} groups from API")
         
         # Also fetch individual chats from /chats endpoint
         logger.info("Step 2: Fetching individual chats from /chats")
-        all_chats = whatsapp_client.get_chats()
+        all_chats = whatsapp_client.get_chats(fetch_all=True)
         logger.info(f"✓ Retrieved {len(all_chats)} chats from API")
         
         groups_synced = 0
@@ -643,16 +643,24 @@ async def sync_chats():
                 logger.warning(f"  [{i}/{len(groups)}] ✗ Skipped group with no JID: {group}")
         
         # Now sync individual chats (non-groups) from /chats
+        # Normalize field names: API may return jid/JID/id and name/Name (mirror group logic)
         logger.info(f"Step 4: Processing {len(all_chats)} individual chats...")
         for i, chat in enumerate(all_chats, 1):
-            chat_jid = chat.get('jid')
+            chat_jid = (
+                chat.get('jid') or chat.get('JID') or
+                chat.get('id') or chat.get('ID')
+            )
             
             # Skip if it's a group (already handled above)
             if chat_jid and '@g.us' in chat_jid:
                 logger.debug(f"  [{i}/{len(all_chats)}] Skipping group (already synced): {chat_jid}")
                 continue
             
-            chat_name = chat.get('name') or f"Chat {chat_jid}"
+            chat_name = (
+                chat.get('name') or chat.get('Name') or
+                chat.get('Subject') or chat.get('subject') or
+                f"Chat {chat_jid}"
+            )
             
             if chat_jid:
                 logger.info(f"  [{i}/{len(all_chats)}] Chat JID: {chat_jid}")

@@ -175,95 +175,154 @@ class WhatsAppClient:
                 logger.error(f"Response text: {e.response.text}")
             return False
     
-    def get_chats(self) -> List[Dict[str, Any]]:
-        """Fetch available chats/groups from WhatsApp API."""
-        url = f"{self.base_url}/chats"
-        
-        try:
-            logger.info(f"Fetching chats from: {url}")
-            response = self.session.get(url, timeout=10)
-            response.raise_for_status()
-            data = response.json()
-            
-            logger.info(f"Chats response type: {type(data)}")
-            
-            # Handle different response formats
-            # Format 1: Direct list [{"id": "...", "name": "..."}]
-            if isinstance(data, list):
-                logger.info(f"Found {len(data)} chats (direct list)")
-                if data:
-                    logger.info(f"Sample chat data: {data[0]}")
-                return data
-            
-            # Format 2: Wrapped in results {"code": "SUCCESS", "results": [...]}
-            if isinstance(data, dict):
-                logger.info(f"Response keys: {data.keys()}")
-                
-                if data.get("code") == "SUCCESS" and "results" in data:
-                    chats = data["results"]
-                    if isinstance(chats, list):
-                        logger.info(f"Found {len(chats)} chats (results list)")
-                        if chats:
-                            logger.info(f"Sample chat data: {chats[0]}")
-                        return chats
-                    elif isinstance(chats, dict) and "data" in chats:
-                        chats_list = chats["data"]
-                        logger.info(f"Found {len(chats_list)} chats (nested data)")
-                        if chats_list:
-                            logger.info(f"Sample chat data: {chats_list[0]}")
-                        return chats_list
-            
-            logger.warning(f"Unexpected response format for get_chats: {str(data)[:500]}")
-            return []
-        
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Error fetching chats: {e}")
-            return []
-    
-    def get_groups(self) -> List[Dict[str, Any]]:
-        """Fetch user's groups from WhatsApp API using /user/my/groups endpoint."""
-        url = f"{self.base_url}/user/my/groups"
-        
-        try:
-            logger.info(f"Fetching groups from: {url}")
-            response = self.session.get(url, timeout=10)
-            response.raise_for_status()
-            data = response.json()
-            
-            logger.info(f"Groups response code: {data.get('code')}")
-            logger.info(f"Groups response keys: {list(data.keys())}")
-            logger.info(f"Full groups response: {str(data)[:1000]}")
-            
-            # Check for success response and extract groups
-            if data.get("code") == "SUCCESS" and "results" in data:
-                groups = data["results"]
-                
-                # Handle both direct list and nested data formats
-                if isinstance(groups, list):
-                    logger.info(f"✓ Found {len(groups)} groups (direct list)")
-                    if groups:
-                        logger.info(f"Sample group structure: {groups[0]}")
-                        # Show sample group fields
-                        sample_keys = list(groups[0].keys())
-                        logger.info(f"Sample group fields: {sample_keys}")
-                    return groups
-                elif isinstance(groups, dict) and "data" in groups:
-                    groups_list = groups["data"]
-                    logger.info(f"✓ Found {len(groups_list)} groups (nested in data)")
-                    if groups_list:
-                        logger.info(f"Sample group structure: {groups_list[0]}")
-                        sample_keys = list(groups_list[0].keys())
-                        logger.info(f"Sample group fields: {sample_keys}")
-                    return groups_list
+    def get_chats(
+        self,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+        fetch_all: bool = False
+    ) -> List[Dict[str, Any]]:
+        """
+        Fetch available chats/groups from WhatsApp API.
+        If the API supports pagination, pass limit/offset or use fetch_all=True to loop until all are fetched.
+        """
+        all_chats: List[Dict[str, Any]] = []
+        page_limit = limit if limit is not None else 100
+        page_offset = offset if offset is not None else 0
+        seen_ids: set = set()
+
+        while True:
+            url = f"{self.base_url}/chats"
+            params = {}
+            if limit is not None or fetch_all:
+                params["limit"] = page_limit
+            if offset is not None or fetch_all:
+                params["offset"] = page_offset
+
+            try:
+                if params:
+                    response = self.session.get(url, params=params, timeout=10)
                 else:
-                    logger.warning(f"Groups data type: {type(groups)}, Content: {groups}")
-            
-            logger.warning(f"Unexpected response format or unsuccessful code: {data}")
-            return []
-        
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Error fetching groups from {url}: {e}")
-            return []
+                    response = self.session.get(url, timeout=10)
+                response.raise_for_status()
+                data = response.json()
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Error fetching chats: {e}")
+                if not fetch_all or not all_chats:
+                    return []
+                break
+
+            # Handle different response formats
+            batch: List[Dict[str, Any]] = []
+            if isinstance(data, list):
+                batch = data
+            elif isinstance(data, dict) and data.get("code") == "SUCCESS" and "results" in data:
+                chats = data["results"]
+                if isinstance(chats, list):
+                    batch = chats
+                elif isinstance(chats, dict) and "data" in chats:
+                    batch = chats["data"]
+            else:
+                if not fetch_all or not all_chats:
+                    logger.warning(f"Unexpected response format for get_chats: {str(data)[:500]}")
+                break
+
+            if not batch:
+                break
+
+            # Dedupe by jid/id so pagination that repeats doesn't inflate the list
+            added = 0
+            for chat in batch:
+                jid = (
+                    chat.get("jid") or chat.get("JID") or
+                    chat.get("id") or chat.get("ID")
+                )
+                if jid and jid not in seen_ids:
+                    seen_ids.add(jid)
+                    all_chats.append(chat)
+                    added += 1
+
+            if not fetch_all:
+                return all_chats
+            if len(batch) < page_limit or added == 0:
+                break
+            page_offset += page_limit
+
+        logger.info(f"get_chats fetch_all: collected {len(all_chats)} chats")
+        return all_chats
+    
+    def get_groups(
+        self,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+        fetch_all: bool = False
+    ) -> List[Dict[str, Any]]:
+        """
+        Fetch user's groups from WhatsApp API using /user/my/groups endpoint.
+        If the API supports pagination, pass limit/offset or use fetch_all=True to loop until all are fetched.
+        """
+        all_groups: List[Dict[str, Any]] = []
+        page_limit = limit if limit is not None else 100
+        page_offset = offset if offset is not None else 0
+        seen_ids: set = set()
+
+        while True:
+            url = f"{self.base_url}/user/my/groups"
+            params = {}
+            if limit is not None or fetch_all:
+                params["limit"] = page_limit
+            if offset is not None or fetch_all:
+                params["offset"] = page_offset
+
+            try:
+                if params:
+                    response = self.session.get(url, params=params, timeout=10)
+                else:
+                    response = self.session.get(url, timeout=10)
+                response.raise_for_status()
+                data = response.json()
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Error fetching groups from {url}: {e}")
+                if not fetch_all or not all_groups:
+                    return []
+                break
+
+            if data.get("code") != "SUCCESS" or "results" not in data:
+                if not fetch_all or not all_groups:
+                    logger.warning(f"Unexpected response format or unsuccessful code: {data}")
+                break
+
+            groups = data["results"]
+            batch: List[Dict[str, Any]] = []
+            if isinstance(groups, list):
+                batch = groups
+            elif isinstance(groups, dict) and "data" in groups:
+                batch = groups["data"]
+            else:
+                logger.warning(f"Groups data type: {type(groups)}, Content: {groups}")
+                break
+
+            if not batch:
+                break
+
+            added = 0
+            for group in batch:
+                jid = (
+                    group.get("JID") or group.get("jid") or
+                    group.get("id") or group.get("ID")
+                )
+                if jid and jid not in seen_ids:
+                    seen_ids.add(jid)
+                    all_groups.append(group)
+                    added += 1
+
+            if not fetch_all:
+                return all_groups
+            if len(batch) < page_limit or added == 0:
+                break
+            page_offset += page_limit
+
+        logger.info(f"get_groups fetch_all: collected {len(all_groups)} groups")
+        return all_groups
     
     def get_chat_info(self, chat_jid: str) -> Optional[Dict[str, Any]]:
         """Get detailed info for a specific chat."""

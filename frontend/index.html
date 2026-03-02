@@ -69,7 +69,7 @@
             </div>
 
             <div class="top-bar-actions">
-                <button class="icon-btn" id="refreshBtn" title="Refresh">
+                <button class="icon-btn" id="refreshBtn" title="Sync from WhatsApp and reload list">
                     <span class="icon">🔄</span>
                 </button>
                 <div class="status-indicator">
@@ -131,7 +131,7 @@
             <div class="quick-actions glass-card">
                 <h3 class="section-title">Quick Actions</h3>
                 <div class="action-buttons">
-                    <button class="action-btn primary" id="syncChatsBtn">
+                    <button class="action-btn primary" id="syncChatsBtn" title="Sync from WhatsApp">
                         <span class="btn-icon">🔄</span>
                         <span class="btn-text">Sync Chats</span>
                     </button>
@@ -192,7 +192,7 @@
                     
                     <div class="search-box">
                         <span class="search-icon">🔍</span>
-                        <input type="text" placeholder="Search chats..." id="searchChats" class="search-input">
+                        <input type="text" placeholder="Search by chat name or phone/JID" id="searchChats" class="search-input" title="Search by chat name or phone/JID">
                     </div>
                 </div>
             </div>
@@ -278,7 +278,7 @@
             <div id="no-chats" class="empty-state glass-card" style="display: none;">
                 <div class="empty-icon">💬</div>
                 <h3 class="empty-title">No Chats Yet</h3>
-                <p class="empty-text">Get started by syncing chats from WhatsApp or adding one manually.</p>
+                <p class="empty-text">Get started by syncing chats from WhatsApp or adding one manually. Use “Sync Chats” to add new chats from WhatsApp.</p>
                 <div class="empty-actions">
                     <button class="action-btn primary" onclick="document.getElementById('syncChatsBtn').click()">
                         <span class="btn-icon">🔄</span>

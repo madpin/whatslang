@@ -201,7 +201,7 @@ function setupEventListeners() {
 
     // Quick actions
     document.getElementById('syncChatsBtn')?.addEventListener('click', syncChats);
-    document.getElementById('refreshBtn')?.addEventListener('click', () => loadChats());
+    document.getElementById('refreshBtn')?.addEventListener('click', onRefreshClick);
     
     // Add chat form
     document.getElementById('addChatBtn')?.addEventListener('click', toggleAddChatForm);
@@ -364,12 +364,12 @@ function switchView(view) {
     if (view === 'dashboard') {
         dashboardOverview.style.display = 'block';
         chatsSection.style.display = 'block';
-        if (searchInput) searchInput.placeholder = 'Search chats...';
+        if (searchInput) searchInput.placeholder = 'Search by chat name or phone/JID';
         displayChats(state.chats);
     } else if (view === 'chats') {
         dashboardOverview.style.display = 'none';
         chatsSection.style.display = 'block';
-        if (searchInput) searchInput.placeholder = 'Search chats...';
+        if (searchInput) searchInput.placeholder = 'Search by chat name or phone/JID';
         displayChats(state.chats);
     } else if (view === 'bots') {
         dashboardOverview.style.display = 'none';
@@ -435,7 +435,14 @@ async function loadChats() {
     try {
         showLoading();
         hideError();
-        
+        // Hide list containers so only skeleton is visible while loading
+        const tableContainer = document.getElementById('table-view-container');
+        const cardsContainer = document.getElementById('chats-container');
+        const noChatsDiv = document.getElementById('no-chats');
+        if (tableContainer) tableContainer.style.display = 'none';
+        if (cardsContainer) cardsContainer.style.display = 'none';
+        if (noChatsDiv) noChatsDiv.style.display = 'none';
+
         // Build query parameters
         const params = new URLSearchParams();
         
@@ -496,11 +503,53 @@ async function loadChats() {
         await updateDashboardStats();
         updateFilterInfo();
         hideLoading();
+        return true;
         
     } catch (error) {
         console.error('Error loading chats:', error);
         showError('Failed to load chats: ' + error.message);
         hideLoading();
+        return false;
+    }
+}
+
+async function onRefreshClick() {
+    const btn = document.getElementById('refreshBtn');
+    if (!btn) return;
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.setAttribute('aria-busy', 'true');
+    btn.innerHTML = '<span class="loading-spinner"></span>';
+    try {
+        // Sync from WhatsApp first, then reload the list
+        let syncSuccess = false;
+        try {
+            const response = await authenticatedFetch(`${API_BASE_URL}/chats/sync`, { method: 'POST' });
+            if (response.ok) {
+                const result = await response.json();
+                showToast(result.message, 'success');
+                syncSuccess = true;
+            } else {
+                const error = await response.json();
+                showToast(error.detail || 'Sync failed', 'error');
+            }
+        } catch (syncError) {
+            console.error('Sync error:', syncError);
+            showToast('Sync failed: ' + syncError.message, 'error');
+        }
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const ok = await loadChats();
+        if (ok && !syncSuccess) {
+            const count = state.chats != null ? state.chats.length : 0;
+            showToast(
+                count !== undefined ? `Chat list updated (${count} chat${count !== 1 ? 's' : ''})` : 'Chat list updated',
+                'success'
+            );
+        }
+    } finally {
+        btn.disabled = false;
+        btn.removeAttribute('aria-busy');
+        btn.innerHTML = originalHtml;
     }
 }
 
@@ -629,7 +678,7 @@ function displayChats(chats) {
             <div class="empty-state glass-card" style="grid-column: 1 / -1;">
                 <div class="empty-icon">🔍</div>
                 <h3 class="empty-title">No matches found</h3>
-                <p class="empty-text">Try adjusting your filters or search term</p>
+                <p class="empty-text">Try another term or clear filters</p>
             </div>
         `;
     } else {
