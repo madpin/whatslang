@@ -451,6 +451,27 @@ async def readiness_check():
         ) from e
 
 
+@app.get("/bots/types")
+async def list_bot_types():
+    """List all available bot types with metadata and prompts."""
+    try:
+        types = []
+        for bot_name, bot_class in bot_manager.bot_classes.items():
+            types.append(
+                {
+                    "name": bot_name,
+                    "display_name": bot_class.__name__,
+                    "prefix": bot_class.PREFIX,
+                    "description": getattr(bot_class, "DESCRIPTION", ""),
+                    "system_prompt": getattr(bot_class, "SYSTEM_PROMPT", ""),
+                }
+            )
+        return types
+    except Exception as e:
+        logger.error(f"Error listing bot types: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 @app.get("/bots", response_model=List[BotStatus])
 async def list_bots():
     """List all running bot instances."""

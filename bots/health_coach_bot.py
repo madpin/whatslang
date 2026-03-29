@@ -33,6 +33,8 @@ class HealthCoachBot(BotBase):
 
     NAME = "health_coach"
     PREFIX = "[health]"
+    DESCRIPTION = "Empathic health coach that gives advice, estimates calories from food images, and supports text, audio, and video."
+    SYSTEM_PROMPT = HEALTH_COACH_SYSTEM_PROMPT
 
     def process_message(
         self, message: Dict[str, Any], history: Optional[List[Dict[str, Any]]] = None

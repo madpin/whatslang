@@ -1,23 +1,23 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useState, useCallback } from 'react';
 import { postSyncChats } from '../api/client';
+import { ToastContainer } from '../components/Toast';
+import { toast } from '../components/toastStore';
 
 const CLASSIC = '/static/index.html';
 
 export function Shell() {
-  const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const navigate = useNavigate();
 
   const onSync = useCallback(async () => {
-    setSyncMsg(null);
     setSyncing(true);
     try {
       const r = await postSyncChats();
-      setSyncMsg(r.message);
+      toast(r.message, 'success');
       navigate(0);
     } catch (e) {
-      setSyncMsg(e instanceof Error ? e.message : 'Sync failed');
+      toast(e instanceof Error ? e.message : 'Sync failed', 'error');
     } finally {
       setSyncing(false);
     }
@@ -35,11 +35,13 @@ export function Shell() {
       <header className="top">
         <div className="brand">
           <span className="brand-mark">WhatsLang</span>
-          <span className="brand-badge">beta</span>
         </div>
         <nav className="nav">
           <NavLink to="/" end className={({ isActive }) => (isActive ? 'active' : '')}>
             Overview
+          </NavLink>
+          <NavLink to="/bots" className={({ isActive }) => (isActive ? 'active' : '')}>
+            Bots
           </NavLink>
           <NavLink to="/chats" className={({ isActive }) => (isActive ? 'active' : '')}>
             Chats
@@ -47,20 +49,20 @@ export function Shell() {
         </nav>
         <div className="actions">
           <button type="button" className="btn secondary" onClick={() => window.location.assign(CLASSIC)}>
-            Classic dashboard
+            Classic UI
           </button>
           <button type="button" className="btn secondary" onClick={onLogout}>
             Log out
           </button>
           <button type="button" className="btn primary" onClick={onSync} disabled={syncing}>
-            {syncing ? 'Syncing…' : 'Sync from WhatsApp'}
+            {syncing ? 'Syncing...' : 'Sync'}
           </button>
         </div>
       </header>
-      {syncMsg ? <div className="banner">{syncMsg}</div> : null}
       <main className="main">
         <Outlet />
       </main>
+      <ToastContainer />
     </div>
   );
 }

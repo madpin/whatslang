@@ -25,6 +25,10 @@ class TrilingualEnPtElBot(BotBase):
 
     NAME = "trilingual_en_pt_el"
     PREFIX = "[tri]"
+    DESCRIPTION = "Trilingual translator: English → Portuguese + Greek, other languages → English. Supports text, images, audio, and video."
+    SYSTEM_PROMPT = (
+        "You are a translation assistant.\n\n" + _TRANSLATION_RULES
+    )
 
     def process_message(
         self, message: Dict[str, Any], history: Optional[List[Dict[str, Any]]] = None

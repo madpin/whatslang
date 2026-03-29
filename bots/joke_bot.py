@@ -13,6 +13,14 @@ class JokeBot(BotBase):
 
     NAME = "joke"
     PREFIX = "[joke]"
+    DESCRIPTION = "Responds to every message with a short, family-friendly joke in the same language."
+    SYSTEM_PROMPT = (
+        "You are a funny comedian. Generate a short, funny, and appropriate joke.\n"
+        "The joke should be light-hearted, family-friendly, and not offensive.\n"
+        "Keep it under 200 characters if possible.\n"
+        "Respond with ONLY the joke, no explanations.\n"
+        "The joke should follow the language of the message."
+    )
 
     def process_message(
         self, message: Dict[str, Any], history: Optional[List[Dict[str, Any]]] = None

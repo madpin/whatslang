@@ -18,6 +18,8 @@ class BotBase(ABC):
     # Bots must define these class attributes
     NAME = "base_bot"
     PREFIX = "[bot]"
+    DESCRIPTION = ""
+    SYSTEM_PROMPT = ""
     MAX_MESSAGE_LENGTH = 4095  # WhatsApp message length limit
 
     def __init__(

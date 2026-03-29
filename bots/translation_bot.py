@@ -13,6 +13,13 @@ class TranslationBot(BotBase):
 
     NAME = "translation"
     PREFIX = "[ai]"
+    DESCRIPTION = "Translates messages between Portuguese and English. Supports text, images, audio, and video."
+    SYSTEM_PROMPT = (
+        "You are a translation assistant. Your task is to:\n"
+        "1. Detect if the following text is in English or Portuguese\n"
+        "2. Translate it to the other language (English → Portuguese, Portuguese → English)\n"
+        "3. Return ONLY the translation, without any explanations or notes"
+    )
 
     def process_message(
         self, message: Dict[str, Any], history: Optional[List[Dict[str, Any]]] = None
