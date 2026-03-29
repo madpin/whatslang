@@ -10,13 +10,13 @@ logger = logging.getLogger(__name__)
 # Shared rules for text translation (used in prompts)
 _TRANSLATION_RULES = """Rules:
 1. Detect the primary language of the text.
-2. If the text is in English: provide BOTH a Portuguese and a Greek translation, using exactly this format (two lines):
-   🇵🇹 Portuguese: [translation]
+2. If the text is in English: provide BOTH a Brazilian Portuguese and a Greek translation, using exactly this format (two lines):
+   🇧🇷 Portuguese: [translation]
    🇬🇷 Greek: [translation]
 3. If the text is in any language other than English (including Portuguese, Greek, or mixed non-English): translate ONLY into English. Return ONLY the English text, with no labels, flags, or extra lines.
 4. If the input mixes languages, use the dominant language to decide."""
 
-_TRANSLATION_RULES_IMAGE = """   - If the text is in English: translate to BOTH Portuguese and Greek (two lines: 🇵🇹 Portuguese: …, 🇬🇷 Greek: …).
+_TRANSLATION_RULES_IMAGE = """   - If the text is in English: translate to BOTH Brazilian Portuguese and Greek (two lines: 🇧🇷 Portuguese: …, 🇬🇷 Greek: …).
    - If the text is in any other language: translate ONLY to English (single block labeled 🌍 English: …)."""
 
 
@@ -104,7 +104,7 @@ class TrilingualEnPtElBot(BotBase):
 {_TRANSLATION_RULES_IMAGE}
    - If the extracted text is in English, present it clearly in this format:
      📝 Original Text: [the text you found]
-     🇵🇹 Portuguese: [translation]
+     🇧🇷 Portuguese: [translation]
      🇬🇷 Greek: [translation]
    - If the extracted text is NOT in English, present:
      📝 Original Text: [the text you found]
