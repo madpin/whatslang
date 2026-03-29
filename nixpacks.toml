@@ -6,7 +6,7 @@ nixPkgs = [
   "python311Packages.virtualenv",
   "curl",
   "ffmpeg-full",
-  "nodejs_20",
+  "nodejs_22",
 ]
 
 [phases.install]
@@ -25,4 +25,3 @@ cmd = ". /opt/venv/bin/activate && uvicorn api.main:app --host 0.0.0.0 --port ${
 [variables]
 PYTHONUNBUFFERED = "1"
 PYTHONDONTWRITEBYTECODE = "1"
-PATH = "/opt/venv/bin:$PATH"
