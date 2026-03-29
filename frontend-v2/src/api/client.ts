@@ -17,6 +17,15 @@ export async function apiFetch(path: string, init: RequestInit = {}): Promise<Re
   return fetch(`${API_BASE}${path}`, { ...init, headers });
 }
 
+async function handleError(r: Response): Promise<never> {
+  let detail = r.statusText;
+  try {
+    const j = await r.json();
+    detail = j.detail || j.message || detail;
+  } catch { /* ignore */ }
+  throw new Error(detail);
+}
+
 /* ---- Types ---- */
 
 export type StatsResponse = {
@@ -50,12 +59,43 @@ export type ChatRow = {
   chat_name: string;
   message_count?: number;
   last_message_time?: string | null;
+  is_manual?: boolean;
+  added_at?: string;
   bots: BotInfo[];
 };
 
 export type ChatsListResponse = {
   chats: ChatRow[];
   pagination?: { total: number; page: number; per_page: number; total_pages: number };
+};
+
+export type LogEntry = {
+  timestamp: string;
+  level: string;
+  message: string;
+};
+
+export type BotLogsData = {
+  bot_name: string;
+  chat_jid: string;
+  logs: LogEntry[];
+};
+
+export type ChatMessage = {
+  id?: string;
+  from_me?: boolean;
+  text?: string;
+  body?: string;
+  timestamp?: string | number;
+  sender?: string;
+  type?: string;
+};
+
+export type BulkActionResult = {
+  success: string[];
+  failed: string[];
+  total: number;
+  message: string;
 };
 
 /* ---- Stats ---- */
@@ -76,16 +116,44 @@ export async function fetchChats(params: URLSearchParams): Promise<ChatsListResp
 
 export async function postSyncChats(): Promise<{ message: string }> {
   const r = await apiFetch('/chats/sync', { method: 'POST' });
-  if (!r.ok) {
-    let detail = r.statusText;
-    try {
-      const j = await r.json();
-      detail = j.detail || detail;
-    } catch {
-      /* ignore */
-    }
-    throw new Error(detail);
-  }
+  if (!r.ok) await handleError(r);
+  return r.json();
+}
+
+export async function addChat(chatJid: string, chatName?: string): Promise<ChatRow> {
+  const r = await apiFetch('/chats', {
+    method: 'POST',
+    body: JSON.stringify({ chat_jid: chatJid, chat_name: chatName }),
+  });
+  if (!r.ok) await handleError(r);
+  return r.json();
+}
+
+export async function deleteChat(chatJid: string): Promise<{ message: string }> {
+  const r = await apiFetch(`/chats/${encodeURIComponent(chatJid)}`, { method: 'DELETE' });
+  if (!r.ok) await handleError(r);
+  return r.json();
+}
+
+export async function fetchChatMessages(chatJid: string, limit = 30): Promise<ChatMessage[]> {
+  const r = await apiFetch(`/chats/${encodeURIComponent(chatJid)}/messages?limit=${limit}`);
+  if (!r.ok) throw new Error(await r.text());
+  const data = await r.json();
+  return data?.results?.messages ?? [];
+}
+
+export async function bulkAction(
+  chatJids: string[],
+  action: string,
+  botName?: string,
+): Promise<BulkActionResult> {
+  const params = new URLSearchParams({ action });
+  if (botName) params.set('bot_name', botName);
+  const r = await apiFetch(`/chats/bulk-action?${params.toString()}`, {
+    method: 'POST',
+    body: JSON.stringify(chatJids),
+  });
+  if (!r.ok) await handleError(r);
   return r.json();
 }
 
@@ -113,6 +181,47 @@ export async function fetchBotsForChat(chatJid: string): Promise<BotInfo[]> {
   return r.json();
 }
 
+export async function fetchChatsForBot(botName: string): Promise<ChatRow[]> {
+  const r = await apiFetch(`/bots/${encodeURIComponent(botName)}/chats`);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+/* ---- Bot Logs ---- */
+
+export async function fetchBotLogs(
+  botName: string,
+  chatJid: string,
+  limit = 100,
+): Promise<BotLogsData> {
+  const r = await apiFetch(
+    `/bots/${encodeURIComponent(botName)}/logs?chat_jid=${encodeURIComponent(chatJid)}&limit=${limit}`,
+  );
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+/* ---- Bot Settings ---- */
+
+export async function updateBotSettings(
+  botName: string,
+  chatJid: string,
+  settings: { answer_owner_messages?: boolean; context_message_count?: number },
+): Promise<{ message: string }> {
+  const params = new URLSearchParams({ chat_jid: chatJid });
+  if (settings.answer_owner_messages !== undefined) {
+    params.set('answer_owner_messages', String(settings.answer_owner_messages));
+  }
+  if (settings.context_message_count !== undefined) {
+    params.set('context_message_count', String(settings.context_message_count));
+  }
+  const r = await apiFetch(`/bots/${encodeURIComponent(botName)}/settings?${params.toString()}`, {
+    method: 'POST',
+  });
+  if (!r.ok) await handleError(r);
+  return r.json();
+}
+
 /* ---- Start / Stop ---- */
 
 export async function startBot(botName: string, chatJid: string): Promise<{ message: string }> {
@@ -120,16 +229,7 @@ export async function startBot(botName: string, chatJid: string): Promise<{ mess
     `/bots/${encodeURIComponent(botName)}/start?chat_jid=${encodeURIComponent(chatJid)}`,
     { method: 'POST' },
   );
-  if (!r.ok) {
-    let detail = r.statusText;
-    try {
-      const j = await r.json();
-      detail = j.detail || detail;
-    } catch {
-      /* ignore */
-    }
-    throw new Error(detail);
-  }
+  if (!r.ok) await handleError(r);
   return r.json();
 }
 
@@ -138,15 +238,6 @@ export async function stopBot(botName: string, chatJid: string): Promise<{ messa
     `/bots/${encodeURIComponent(botName)}/stop?chat_jid=${encodeURIComponent(chatJid)}`,
     { method: 'POST' },
   );
-  if (!r.ok) {
-    let detail = r.statusText;
-    try {
-      const j = await r.json();
-      detail = j.detail || detail;
-    } catch {
-      /* ignore */
-    }
-    throw new Error(detail);
-  }
+  if (!r.ok) await handleError(r);
   return r.json();
 }
