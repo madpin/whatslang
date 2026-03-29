@@ -289,6 +289,10 @@ async def protect_api_endpoints(request: Request, call_next):
         if request.url.path.startswith("/static/"):
             return await call_next(request)
 
+        # Beta dashboard (v2): static assets; auth enforced in the SPA + API calls
+        if request.url.path.startswith("/v2/") or request.url.path == "/v2":
+            return await call_next(request)
+
         # Check if path is public
         is_public = any(request.url.path == public_path for public_path in public_paths)
 
@@ -328,8 +332,12 @@ async def log_requests(request: Request, call_next):
         },
     )
 
-    # Add cache control headers for static files
-    if request.url.path.startswith("/static/"):
+    # Add cache control headers for static files (legacy + v2 dashboard)
+    if (
+        request.url.path.startswith("/static/")
+        or request.url.path.startswith("/v2/")
+        or request.url.path == "/v2"
+    ):
         # No cache for development, short cache for production
         if ENVIRONMENT == "production":
             response.headers["Cache-Control"] = "public, max-age=300"  # 5 minutes
@@ -344,10 +352,15 @@ async def log_requests(request: Request, call_next):
 # Include auth router
 app.include_router(auth.router)
 
-# Mount static files for frontend
+# Mount static files for frontend (legacy dashboard)
 frontend_path = Path(__file__).parent.parent / "frontend"
 if frontend_path.exists():
     app.mount("/static", StaticFiles(directory=str(frontend_path), html=True), name="static")
+
+# Beta dashboard (Vite/React build)
+frontend_v2_path = Path(__file__).parent.parent / "frontend-v2" / "dist"
+if frontend_v2_path.exists():
+    app.mount("/v2", StaticFiles(directory=str(frontend_v2_path), html=True), name="frontend_v2")
 
 
 @app.get("/")
@@ -355,10 +368,12 @@ async def root():
     """Root endpoint - redirect to login page or dashboard."""
     # Check if password protection is enabled
     dashboard_password = os.getenv("DASHBOARD_PASSWORD", "")
+    default_ui = os.getenv("DASHBOARD_DEFAULT_UI", "classic").strip().lower()
     if dashboard_password:
         return RedirectResponse(url="/static/login.html")
-    else:
-        return RedirectResponse(url="/static/index.html")
+    if default_ui == "v2":
+        return RedirectResponse(url="/v2/")
+    return RedirectResponse(url="/static/index.html")
 
 
 @app.get("/favicon.ico")
@@ -382,6 +397,7 @@ async def api_info():
             "ready": "/ready",
             "bots": "/bots",
             "frontend": "/static/index.html",
+            "frontend_v2": "/v2/",
             "docs": "/docs" if ENVIRONMENT != "production" else None,
         },
     }

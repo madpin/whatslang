@@ -92,7 +92,9 @@ python run.py
 
 6. **Access the dashboard**
 
-Open http://localhost:8000/static/index.html in your browser
+Open http://localhost:8000/static/index.html in your browser (classic dashboard).
+
+The beta UI (Vite + React) is served at **http://localhost:8000/v2/** — same API, same auth. Use the sidebar link in the classic UI to switch. With no password set, you can set `DASHBOARD_DEFAULT_UI=v2` so `/` redirects to `/v2/` instead of the classic index.
 
 ## 🐳 Docker Deployment
 
@@ -168,13 +170,15 @@ Dokploy automatically detects and uses the `nixpacks.toml` configuration.
 
 5. **Deploy** - Dokploy will:
    - Detect Nixpacks configuration
-   - Build using Python 3.11
-   - Install dependencies
+   - Build using Python 3.11 and install dependencies
+   - Run `npm ci && npm run build` in `frontend-v2/` (beta dashboard at `/v2/`)
    - Start the service on port 8000
 
 6. **Configure health checks**:
    - Liveness: `GET /health`
    - Readiness: `GET /ready`
+
+If the image build fails because `nodejs_20` is not found in Nixpacks’ nixpkgs snapshot, change `nixpacks.toml` to use another Node package name your channel provides (for example `nodejs` or `nodejs_22`).
 
 ## 💾 Data Persistence
 
@@ -230,10 +234,13 @@ whatslang/
 │   ├── DEPLOYMENT.md      # Deployment guide
 │   ├── PERSISTENCE.md     # Data persistence guide
 │   └── dev-notes/         # Development notes
-├── frontend/              # Web dashboard
+├── frontend/              # Web dashboard (classic)
 │   ├── index.html         # Dashboard UI
 │   ├── app.js            # Frontend logic
 │   └── styles.css        # Styling
+├── frontend-v2/           # Beta dashboard (Vite + React, built to dist/)
+│   ├── package.json
+│   └── src/               # App source
 ├── Dockerfile            # Multi-stage Docker build
 ├── docker-compose.yml    # Docker Compose configuration
 ├── nixpacks.toml         # Nixpacks/Dokploy configuration

@@ -180,6 +180,24 @@ body {
     border-top: 1px solid var(--glass-border);
 }
 
+.sidebar-v2-link {
+    display: block;
+    margin-top: var(--spacing-md);
+    padding: 0.5rem 0.75rem;
+    text-align: center;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--primary, #6366f1);
+    text-decoration: none;
+    border-radius: var(--radius-md);
+    border: 1px solid rgba(99, 102, 241, 0.35);
+    background: rgba(99, 102, 241, 0.08);
+}
+
+.sidebar-v2-link:hover {
+    background: rgba(99, 102, 241, 0.15);
+}
+
 .stats-mini {
     display: grid;
     grid-template-columns: 1fr 1fr;
