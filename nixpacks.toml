@@ -1,5 +1,6 @@
 # Nixpacks configuration for Dokploy deployment
 [phases.setup]
+nixpkgsArchive = "51ad838b03a05b1de6f9f2a0fffecee64a9788ee"
 nixPkgs = [
   "python311",
   "python311Packages.pip",
@@ -17,7 +18,7 @@ cmds = [
 ]
 
 [phases.build]
-cmds = ["cd frontend-v2 && npm ci && npm run build"]
+cmds = ["cd frontend-v2 && npm install && npm run build"]
 
 [start]
 cmd = ". /opt/venv/bin/activate && uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips '*'"
