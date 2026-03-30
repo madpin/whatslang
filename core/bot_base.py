@@ -112,6 +112,77 @@ class BotBase(ABC):
 
         return [f"{prefix} {i+1}/{total_chunks} {chunk}" for i, chunk in enumerate(chunks)]
 
+    @staticmethod
+    def _jid_user_part(jid: str) -> str:
+        """User/phone id before @, ignoring device suffix (e.g. 123:45@s.whatsapp.net -> 123)."""
+        if not jid:
+            return ""
+        if "@" in jid:
+            jid = jid.split("@", 1)[0]
+        return jid.split(":", 1)[0]
+
+    @staticmethod
+    def _is_group_chat(chat_jid: str) -> bool:
+        return bool(chat_jid and chat_jid.endswith("@g.us"))
+
+    def _forward_sender_display(self, message: Dict[str, Any]) -> str:
+        """
+        Human-readable label for forwarded context: saved contact name when possible,
+        else API fields, else phone from JID.
+        """
+        if message.get("is_from_me", False):
+            return "me"
+
+        for key in (
+            "push_name",
+            "pushName",
+            "PushName",
+            "sender_name",
+            "senderName",
+            "SenderName",
+        ):
+            val = message.get(key)
+            if isinstance(val, str) and val.strip():
+                return val.strip()
+
+        sender_jid = (
+            message.get("sender_jid", "")
+            or message.get("from", "")
+            or message.get("sender", "")
+        )
+        if not sender_jid:
+            return "unknown"
+
+        # 1:1: chat row name is usually the contact name synced from WhatsApp
+        if not self._is_group_chat(self.chat_jid):
+            su, cu = self._jid_user_part(sender_jid), self._jid_user_part(self.chat_jid)
+            if su and cu and su == cu:
+                row = self.db.get_chat(self.chat_jid)
+                if row:
+                    cn = (row.get("chat_name") or "").strip()
+                    placeholder = f"Chat {self.chat_jid}"
+                    if cn and cn != placeholder:
+                        return cn
+
+        # Per-contact display name from WhatsApp API (works for groups and DMs)
+        try:
+            info = self.whatsapp.get_chat_info(sender_jid)
+            if isinstance(info, dict):
+                layers = [info]
+                if isinstance(info.get("data"), dict):
+                    layers.append(info["data"])
+                for layer in layers:
+                    for key in ("name", "Name", "subject", "Subject", "title", "Title"):
+                        v = layer.get(key)
+                        if isinstance(v, str) and v.strip():
+                            return v.strip()
+        except Exception as e:
+            logger.debug(f"[{self.NAME}] get_chat_info for forward label failed: {e}")
+
+        if "@" in sender_jid:
+            return sender_jid.split("@")[0]
+        return sender_jid
+
     def get_message_history(self, current_message_id: str, count: int) -> List[Dict[str, Any]]:
         """
         Retrieve message history from WhatsApp for context.
@@ -277,11 +348,7 @@ class BotBase(ABC):
 
             # If forwarding to another chat, send the original message as context first
             if response_chat_jid:
-                if message.get("is_from_me", False):
-                    sender = "me"
-                else:
-                    sender_jid = message.get("sender_jid", "") or message.get("from", "") or message.get("sender", "")
-                    sender = sender_jid.split("@")[0] if sender_jid and "@" in sender_jid else (sender_jid or "unknown")
+                sender = self._forward_sender_display(message)
                 fwd_text = f"[Fwd from {sender}]: {msg_text}" if msg_text else f"[Fwd from {sender}]: [media]"
                 logger.info(f"[{self.NAME}] Forwarding original message to {response_chat_jid}")
                 fwd_success = self.whatsapp.send_message(phone=response_chat_jid, message=fwd_text)
