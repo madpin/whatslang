@@ -14,6 +14,7 @@ import { StatusBadge } from '../components/StatusBadge';
 import { BotLogsModal } from '../components/BotLogsModal';
 import { MessagesModal } from '../components/MessagesModal';
 import { Toggle } from '../components/Toggle';
+import { ChatSelectCombobox } from '../components/ChatSelectCombobox';
 import { toast } from '../components/toastStore';
 
 const REFRESH_INTERVAL_MS = 30_000;
@@ -122,26 +123,14 @@ function BotInstanceSettings({ bot, allChats, onUpdate }: BotInstanceSettingsPro
       </label>
       <label className="setting-item">
         <span className="setting-label">Forward to</span>
-        <select
-          className="setting-input"
-          value={bot.response_chat_jid ?? ''}
+        <ChatSelectCombobox
+          chats={allChats}
+          excludeJid={bot.chat_jid}
+          value={bot.response_chat_jid}
           disabled={saving}
-          onChange={(e) => {
-            const val = e.target.value || null;
-            saveSettings({ response_chat_jid: val });
-          }}
-          aria-label="Forward response to another chat"
-          title="Forward original message and bot response to another chat"
-        >
-          <option value="">Same chat</option>
-          {allChats
-            .filter((c) => c.chat_jid !== bot.chat_jid)
-            .map((c) => (
-              <option key={c.chat_jid} value={c.chat_jid}>
-                {c.chat_name || c.chat_jid.split('@')[0]}
-              </option>
-            ))}
-        </select>
+          onChange={(jid) => saveSettings({ response_chat_jid: jid })}
+          ariaLabel="Forward response to another chat"
+        />
       </label>
       {saving && <Loader2 size={12} className="spin muted" />}
     </div>

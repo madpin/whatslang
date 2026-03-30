@@ -1160,6 +1160,169 @@ code { font-size: 0.85em; background: rgba(255,255,255,0.06); padding: 0.15em 0.
 .log-search-input::placeholder { color: var(--text-muted); }
 .log-search-input:focus { border-color: var(--border-focus); }
 
+/* ---- Chat Combobox (searchable forward-to selector) ---- */
+
+.chat-combobox {
+  position: relative;
+  min-width: 170px;
+  flex-shrink: 0;
+}
+
+.chat-combobox-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  width: 100%;
+  padding: 0.2rem 0.4rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 0.78rem;
+  font-family: inherit;
+  cursor: pointer;
+  outline: none;
+  text-align: left;
+  transition: border-color 0.2s;
+}
+.chat-combobox-trigger:hover { border-color: var(--border-focus); }
+.chat-combobox-trigger:focus { border-color: var(--border-focus); }
+.chat-combobox-trigger:disabled { opacity: 0.5; cursor: default; }
+
+.chat-combobox-value {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: hidden;
+  flex: 1;
+  min-width: 0;
+}
+.chat-combobox-name {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+.chat-combobox-jid {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', monospace;
+}
+
+.chat-combobox-placeholder {
+  color: var(--text-muted);
+  flex: 1;
+}
+
+.chat-combobox-chevron {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  transition: transform 0.15s;
+}
+.chat-combobox-chevron.open { transform: rotate(180deg); }
+
+.chat-combobox-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  min-width: 260px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  z-index: 100;
+  overflow: hidden;
+  animation: combobox-appear 0.12s ease-out;
+}
+
+@keyframes combobox-appear {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.chat-combobox-search {
+  display: flex;
+  align-items: center;
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+  gap: 0.35rem;
+}
+.chat-combobox-search-icon { flex-shrink: 0; color: var(--text-muted); }
+.chat-combobox-search-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.78rem;
+  font-family: inherit;
+  outline: none;
+  min-width: 0;
+}
+.chat-combobox-search-input::placeholder { color: var(--text-muted); }
+.chat-combobox-search-clear {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+}
+
+.chat-combobox-list {
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem 0;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.chat-combobox-option {
+  display: flex;
+  flex-direction: column;
+  padding: 0.35rem 0.6rem;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.chat-combobox-option:hover { background: var(--bg-hover); }
+.chat-combobox-option.selected {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.chat-combobox-option-name {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chat-combobox-option-jid {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', monospace;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-combobox-empty {
+  padding: 0.6rem;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  text-align: center;
+  font-style: italic;
+}
+
 /* ---- Chats page legend ---- */
 
 .chats-legend {

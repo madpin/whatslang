@@ -1258,9 +1258,11 @@ function buildForwardToOptions(currentChatJid, selectedJid) {
     let options = '<option value="">Same chat</option>';
     chats.forEach(chat => {
         if (chat.chat_jid !== currentChatJid) {
-            const name = escapeHtml(chat.chat_name || chat.chat_jid.split('@')[0]);
+            const shortJid = chat.chat_jid.split('@')[0];
+            const name = chat.chat_name ? escapeHtml(chat.chat_name) : shortJid;
+            const label = chat.chat_name ? `${name} (${shortJid})` : shortJid;
             const selected = chat.chat_jid === selectedJid ? 'selected' : '';
-            options += `<option value="${escapeAttr(chat.chat_jid)}" ${selected}>${name}</option>`;
+            options += `<option value="${escapeAttr(chat.chat_jid)}" ${selected}>${label}</option>`;
         }
     });
     return options;
