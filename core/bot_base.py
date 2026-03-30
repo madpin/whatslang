@@ -152,7 +152,7 @@ class BotBase(ABC):
                     is_bot = True
 
                 # Get sender information
-                sender = msg.get("sender", "") or msg.get("from", "")
+                sender = msg.get("sender_jid", "") or msg.get("sender", "") or msg.get("from", "")
                 is_from_me = msg.get("is_from_me", False)
 
                 history.append(
@@ -211,7 +211,7 @@ class BotBase(ABC):
 
         # Skip messages from bots (check sender)
         if self.bot_device_id:
-            sender_jid = message.get("from", "") or message.get("sender", "")
+            sender_jid = message.get("sender_jid", "") or message.get("from", "") or message.get("sender", "")
             if sender_jid and self.whatsapp.is_bot_message(sender_jid, self.bot_device_id):
                 logger.debug(f"[{self.NAME}] Skipping message from bot: {sender_jid}")
                 return False
@@ -277,7 +277,11 @@ class BotBase(ABC):
 
             # If forwarding to another chat, send the original message as context first
             if response_chat_jid:
-                sender = message.get("from", "") or message.get("sender", "unknown")
+                if message.get("is_from_me", False):
+                    sender = "me"
+                else:
+                    sender_jid = message.get("sender_jid", "") or message.get("from", "") or message.get("sender", "")
+                    sender = sender_jid.split("@")[0] if sender_jid and "@" in sender_jid else (sender_jid or "unknown")
                 fwd_text = f"[Fwd from {sender}]: {msg_text}" if msg_text else f"[Fwd from {sender}]: [media]"
                 logger.info(f"[{self.NAME}] Forwarding original message to {response_chat_jid}")
                 fwd_success = self.whatsapp.send_message(phone=response_chat_jid, message=fwd_text)
