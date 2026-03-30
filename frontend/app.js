@@ -131,6 +131,7 @@ async function init() {
     window.toggleAnswerOwner = toggleAnswerOwner;
     window.updateContextCount = updateContextCount;
     window.adjustContextCount = adjustContextCount;
+    window.updateResponseChat = updateResponseChat;
     
     // Check if we should add logout button (if authenticated)
     const authToken = sessionStorage.getItem('auth_token');
@@ -810,6 +811,7 @@ function createBotCard(bot, chatJid) {
     const answerOwnerChecked = bot.answer_owner_messages !== false ? 'checked' : '';
     const contextCount = bot.context_message_count || 0;
     const contextHint = contextCount === 0 ? 'Disabled' : `${contextCount} previous message${contextCount !== 1 ? 's' : ''}`;
+    const responseChatJid = bot.response_chat_jid || '';
     
     return `
         <div class="bot-card ${runningClass}" data-bot-name="${bot.name}" data-chat-jid="${chatJid}">
@@ -852,6 +854,13 @@ function createBotCard(bot, chatJid) {
                         <button class="increment-btn" onclick="adjustContextCount('${bot.name}', '${escapeAttr(chatJid)}', ${contextCount}, 1)">+</button>
                     </div>
                     <div class="setting-hint">${contextHint}</div>
+                </div>
+                <div class="bot-info-row bot-setting">
+                    <span class="bot-info-label">Forward to</span>
+                    <select class="context-input forward-select"
+                            onchange="updateResponseChat('${bot.name}', '${escapeAttr(chatJid)}', this.value)">
+                        ${buildForwardToOptions(chatJid, responseChatJid)}
+                    </select>
                 </div>
             </div>
             
@@ -1208,6 +1217,37 @@ function adjustContextCount(botName, chatJid, currentCount, delta) {
     updateContextCount(botName, chatJid, newCount);
 }
 
+async function updateResponseChat(botName, chatJid, targetJid) {
+    try {
+        console.log('updateResponseChat called:', { botName, chatJid, targetJid });
+        const url = `${API_BASE_URL}/bots/${encodeURIComponent(botName)}/settings?chat_jid=${encodeURIComponent(chatJid)}&response_chat_jid=${encodeURIComponent(targetJid)}`;
+        const response = await authenticatedFetch(url, { method: 'POST' });
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
+            throw new Error(error.detail || 'Failed to update response chat');
+        }
+        const result = await response.json();
+        showToast(result.message || 'Response destination updated', 'success');
+    } catch (error) {
+        console.error(`Error updating response chat for ${botName}:`, error);
+        showToast(`Failed to update response destination: ${error.message}`, 'error');
+        await loadChats();
+    }
+}
+
+function buildForwardToOptions(currentChatJid, selectedJid) {
+    const chats = state.chats || [];
+    let options = '<option value="">Same chat</option>';
+    chats.forEach(chat => {
+        if (chat.chat_jid !== currentChatJid) {
+            const name = escapeHtml(chat.chat_name || chat.chat_jid.split('@')[0]);
+            const selected = chat.chat_jid === selectedJid ? 'selected' : '';
+            options += `<option value="${escapeAttr(chat.chat_jid)}" ${selected}>${name}</option>`;
+        }
+    });
+    return options;
+}
+
 async function toggleLogs(botName, chatJid) {
     const logsKey = `${botName}::${chatJid}`;
     const safeJid = makeSafeId(chatJid);
@@ -1475,6 +1515,7 @@ function createBotCardWithChat(bot) {
     const answerOwnerChecked = bot.answer_owner_messages !== false ? 'checked' : '';
     const contextCount = bot.context_message_count || 0;
     const contextHint = contextCount === 0 ? 'Disabled' : `${contextCount} previous message${contextCount !== 1 ? 's' : ''}`;
+    const responseChatJid = bot.response_chat_jid || '';
 
     return `
         <div class="bot-card-standalone ${runningClass}" data-bot-name="${bot.name}" data-chat-jid="${bot.chatJid}">
@@ -1522,6 +1563,13 @@ function createBotCardWithChat(bot) {
                         <button class="increment-btn" onclick="adjustContextCount('${bot.name}', '${escapeAttr(bot.chatJid)}', ${contextCount}, 1)">+</button>
                     </div>
                     <div class="setting-hint">${contextHint}</div>
+                </div>
+                <div class="bot-info-row bot-setting">
+                    <span class="bot-info-label">Forward to</span>
+                    <select class="context-input forward-select"
+                            onchange="updateResponseChat('${bot.name}', '${escapeAttr(bot.chatJid)}', this.value)">
+                        ${buildForwardToOptions(bot.chatJid, responseChatJid)}
+                    </select>
                 </div>
             </div>
             
@@ -1809,6 +1857,7 @@ function createExpandedRow(chat) {
         const answerOwnerChecked = bot.answer_owner_messages !== false ? 'checked' : '';
         const contextCount = bot.context_message_count || 0;
         const contextHint = contextCount === 0 ? 'Disabled' : `${contextCount} previous message${contextCount !== 1 ? 's' : ''}`;
+        const responseChatJid = bot.response_chat_jid || '';
         
         return `
             <div class="bot-detail-item">
@@ -1846,6 +1895,13 @@ function createExpandedRow(chat) {
                             <button class="increment-btn" onclick="adjustContextCount('${bot.name}', '${escapeAttr(chat.chat_jid)}', ${contextCount}, 1)">+</button>
                         </div>
                         <div class="setting-hint">${contextHint}</div>
+                    </div>
+                    <div class="bot-detail-setting">
+                        <label class="toggle-label">Forward to:</label>
+                        <select class="context-input forward-select"
+                                onchange="updateResponseChat('${bot.name}', '${escapeAttr(chat.chat_jid)}', this.value)">
+                            ${buildForwardToOptions(chat.chat_jid, responseChatJid)}
+                        </select>
                     </div>
                 </div>
                 <div class="bot-detail-actions">

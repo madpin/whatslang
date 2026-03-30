@@ -8,7 +8,7 @@ import {
   fetchBotTypes, fetchRunningBots, fetchChats,
   stopBot as apiStopBot, startBot as apiStartBot,
   updateBotSettings,
-  type BotType, type BotInfo, type ChatRow,
+  type BotType, type BotInfo, type ChatRow, type ChatsListResponse,
 } from '../api/client';
 import { StatusBadge } from '../components/StatusBadge';
 import { BotLogsModal } from '../components/BotLogsModal';
@@ -58,15 +58,16 @@ function CopyButton({ text }: { text: string }) {
 
 interface BotInstanceSettingsProps {
   bot: BotInfo;
+  allChats: ChatRow[];
   onUpdate: (botName: string, chatJid: string, updates: Partial<BotInfo>) => void;
 }
 
-function BotInstanceSettings({ bot, onUpdate }: BotInstanceSettingsProps) {
+function BotInstanceSettings({ bot, allChats, onUpdate }: BotInstanceSettingsProps) {
   const [contextVal, setContextVal] = useState(String(bot.context_message_count ?? 0));
   const [saving, setSaving] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  async function saveSettings(patch: { answer_owner_messages?: boolean; context_message_count?: number }) {
+  async function saveSettings(patch: { answer_owner_messages?: boolean; context_message_count?: number; response_chat_jid?: string | null }) {
     setSaving(true);
     try {
       await updateBotSettings(bot.name, bot.chat_jid, patch);
@@ -118,6 +119,29 @@ function BotInstanceSettings({ bot, onUpdate }: BotInstanceSettingsProps) {
           title="Number of previous messages to include as context"
         />
         <span className="setting-label">msgs</span>
+      </label>
+      <label className="setting-item">
+        <span className="setting-label">Forward to</span>
+        <select
+          className="setting-input"
+          value={bot.response_chat_jid ?? ''}
+          disabled={saving}
+          onChange={(e) => {
+            const val = e.target.value || null;
+            saveSettings({ response_chat_jid: val });
+          }}
+          aria-label="Forward response to another chat"
+          title="Forward original message and bot response to another chat"
+        >
+          <option value="">Same chat</option>
+          {allChats
+            .filter((c) => c.chat_jid !== bot.chat_jid)
+            .map((c) => (
+              <option key={c.chat_jid} value={c.chat_jid}>
+                {c.chat_name || c.chat_jid.split('@')[0]}
+              </option>
+            ))}
+        </select>
       </label>
       {saving && <Loader2 size={12} className="spin muted" />}
     </div>
@@ -216,6 +240,7 @@ function StartBotPanel({ botName, existingJids, onStarted }: StartBotPanelProps)
 export function Bots() {
   const [types, setTypes] = useState<BotType[]>([]);
   const [running, setRunning] = useState<BotInfo[]>([]);
+  const [allChats, setAllChats] = useState<ChatRow[]>([]);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -231,9 +256,12 @@ export function Bots() {
   const load = useCallback(async (isManual = false) => {
     if (isManual) setRefreshing(true);
     try {
-      const [t, r] = await Promise.all([fetchBotTypes(), fetchRunningBots()]);
+      const chatParams = new URLSearchParams({ per_page: '500', page: '1', sort: 'chat_name', order: 'asc' });
+      const [t, r, chatData] = await Promise.all([fetchBotTypes(), fetchRunningBots(), fetchChats(chatParams)]);
       setTypes(t);
       setRunning(r);
+      const chatList = Array.isArray(chatData) ? chatData : ((chatData as ChatsListResponse).chats ?? []);
+      setAllChats(chatList);
       setErr(null);
       setLastRefreshed(new Date());
     } catch (e) {
@@ -496,6 +524,7 @@ export function Bots() {
                               </div>
                               <BotInstanceSettings
                                 bot={inst}
+                                allChats={allChats}
                                 onUpdate={handleInstanceUpdate}
                               />
                             </li>

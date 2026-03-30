@@ -44,6 +44,7 @@ export type BotInfo = {
   uptime_seconds?: number;
   answer_owner_messages?: boolean;
   context_message_count?: number;
+  response_chat_jid?: string | null;
 };
 
 export type BotType = {
@@ -240,7 +241,7 @@ export async function fetchBotLogs(
 export async function updateBotSettings(
   botName: string,
   chatJid: string,
-  settings: { answer_owner_messages?: boolean; context_message_count?: number },
+  settings: { answer_owner_messages?: boolean; context_message_count?: number; response_chat_jid?: string | null },
 ): Promise<{ message: string }> {
   const params = new URLSearchParams({ chat_jid: chatJid });
   if (settings.answer_owner_messages !== undefined) {
@@ -248,6 +249,9 @@ export async function updateBotSettings(
   }
   if (settings.context_message_count !== undefined) {
     params.set('context_message_count', String(settings.context_message_count));
+  }
+  if (settings.response_chat_jid !== undefined) {
+    params.set('response_chat_jid', settings.response_chat_jid ?? '');
   }
   const r = await apiFetch(`/bots/${encodeURIComponent(botName)}/settings?${params.toString()}`, {
     method: 'POST',

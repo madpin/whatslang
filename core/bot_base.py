@@ -271,17 +271,36 @@ class BotBase(ABC):
                 )
                 return
 
+            # Determine where to send the response
+            response_chat_jid = self.db.get_bot_response_chat_jid(self.NAME, self.chat_jid)
+            target_chat = response_chat_jid if response_chat_jid else self.chat_jid
+
+            # If forwarding to another chat, send the original message as context first
+            if response_chat_jid:
+                sender = message.get("from", "") or message.get("sender", "unknown")
+                fwd_text = f"[Fwd from {sender}]: {msg_text}" if msg_text else f"[Fwd from {sender}]: [media]"
+                logger.info(f"[{self.NAME}] Forwarding original message to {response_chat_jid}")
+                fwd_success = self.whatsapp.send_message(phone=response_chat_jid, message=fwd_text)
+                if not fwd_success:
+                    logger.error(
+                        f"[{self.NAME}] Failed to forward original message to {response_chat_jid} "
+                        f"for message {message_id}, aborting response"
+                    )
+                    return
+                time.sleep(0.5)
+
             # Split message if needed and send chunks
             message_chunks = self.split_message(response_text)
-            logger.info(f"[{self.NAME}] Sending response in {len(message_chunks)} chunk(s)")
+            logger.info(f"[{self.NAME}] Sending response in {len(message_chunks)} chunk(s) to {target_chat}")
 
             success = True
             for i, chunk in enumerate(message_chunks, 1):
                 logger.info(
                     f"[{self.NAME}] Sending chunk {i}/{len(message_chunks)}: {len(chunk)} chars"
                 )
+                reply_id = message_id if not response_chat_jid else None
                 success = self.whatsapp.send_message(
-                    phone=self.chat_jid, message=chunk, reply_message_id=message_id
+                    phone=target_chat, message=chunk, reply_message_id=reply_id
                 )
                 if not success:
                     logger.error(f"[{self.NAME}] Failed to send chunk {i} for message {message_id}")
@@ -289,13 +308,12 @@ class BotBase(ABC):
                 time.sleep(0.5)  # Small delay between chunks
 
             if success:
-                # Mark as processed
                 self.db.mark_processed(
                     message_id=message_id,
                     bot_name=self.NAME,
                     original_text=msg_text,
-                    response_text=response_text[:500],  # Truncate for storage
-                    metadata="",
+                    response_text=response_text[:500],
+                    metadata=f"forwarded_to={response_chat_jid}" if response_chat_jid else "",
                 )
                 logger.info(f"[{self.NAME}] Successfully processed message {message_id}")
             else:

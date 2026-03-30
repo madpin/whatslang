@@ -114,6 +114,9 @@ class BotManager:
         # Get context_message_count setting from database
         context_message_count = self.database.get_bot_context_message_count(bot_name, chat_jid)
 
+        # Get response_chat_jid setting from database
+        response_chat_jid = self.database.get_bot_response_chat_jid(bot_name, chat_jid)
+
         status = {
             "name": bot_name,
             "chat_jid": chat_jid,
@@ -123,6 +126,7 @@ class BotManager:
             "uptime_seconds": None,
             "answer_owner_messages": answer_owner_messages,
             "context_message_count": context_message_count,
+            "response_chat_jid": response_chat_jid,
         }
 
         if is_running and bot_key in self.bot_start_times:

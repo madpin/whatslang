@@ -105,6 +105,15 @@ class MessageDatabase:
         except sqlite3.OperationalError:
             pass  # Column already exists
 
+        # Add response_chat_jid column if it doesn't exist (for existing databases)
+        try:
+            cursor.execute(
+                "ALTER TABLE bot_chat_assignments ADD COLUMN response_chat_jid TEXT DEFAULT NULL"
+            )
+            logger.info("Added 'response_chat_jid' column to bot_chat_assignments table")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+
         conn.commit()
         conn.close()
         logger.info(f"Database initialized at {self.db_path}")
@@ -536,6 +545,49 @@ class MessageDatabase:
         if assignment is None:
             return 0  # Default to no context
         return assignment.get("context_message_count", 0)
+
+    def set_bot_response_chat_jid(
+        self, bot_name: str, chat_jid: str, response_chat_jid: Optional[str] = None
+    ) -> bool:
+        """Set the target chat JID where bot responses should be forwarded for a specific assignment."""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+
+            cursor.execute(
+                """
+                UPDATE bot_chat_assignments
+                SET response_chat_jid = ?
+                WHERE bot_name = ? AND chat_jid = ?
+            """,
+                (response_chat_jid, bot_name, chat_jid),
+            )
+
+            if cursor.rowcount == 0:
+                cursor.execute(
+                    """
+                    INSERT INTO bot_chat_assignments (bot_name, chat_jid, response_chat_jid)
+                    VALUES (?, ?, ?)
+                """,
+                    (bot_name, chat_jid, response_chat_jid),
+                )
+
+            conn.commit()
+            conn.close()
+            logger.info(
+                f"Set bot response_chat_jid: {bot_name} -> {chat_jid} (response_chat_jid={response_chat_jid})"
+            )
+            return True
+        except Exception as e:
+            logger.error(f"Error setting bot response_chat_jid: {e}", exc_info=True)
+            return False
+
+    def get_bot_response_chat_jid(self, bot_name: str, chat_jid: str) -> Optional[str]:
+        """Get the target chat JID for forwarding bot responses. Returns None when not set (same-chat behavior)."""
+        assignment = self.get_bot_assignment(bot_name, chat_jid)
+        if assignment is None:
+            return None
+        return assignment.get("response_chat_jid")
 
     def get_bot_assignment(self, bot_name: str, chat_jid: str) -> Optional[Dict[str, Any]]:
         """Get a specific bot-chat assignment."""

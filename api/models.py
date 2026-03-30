@@ -14,8 +14,9 @@ class BotStatus(BaseModel):
     status: str  # "running" or "stopped"
     prefix: str
     uptime_seconds: Optional[int] = None
-    answer_owner_messages: bool = True  # Whether the bot should answer owner messages
-    context_message_count: int = 0  # Number of previous messages to include as context
+    answer_owner_messages: bool = True
+    context_message_count: int = 0
+    response_chat_jid: Optional[str] = None
 
 
 class BotLog(BaseModel):

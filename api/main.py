@@ -1008,6 +1008,7 @@ async def update_bot_settings(
     chat_jid: str,
     answer_owner_messages: Optional[bool] = None,
     context_message_count: Optional[int] = None,
+    response_chat_jid: Optional[str] = None,
 ):
     """
     Update bot settings for a specific chat.
@@ -1016,6 +1017,7 @@ async def update_bot_settings(
     - chat_jid: The chat JID
     - answer_owner_messages: Whether the bot should answer owner messages (optional)
     - context_message_count: Number of previous messages to include as context (optional)
+    - response_chat_jid: Target chat JID for forwarding responses (optional, empty string to clear)
     """
     try:
         updates = []
@@ -1043,6 +1045,25 @@ async def update_bot_settings(
                     status_code=400, detail="Failed to update context_message_count"
                 )
             updates.append(f"context_message_count={context_message_count}")
+
+        # Update response_chat_jid if provided
+        if response_chat_jid is not None:
+            target_jid = response_chat_jid.strip() if response_chat_jid else None
+            if target_jid == "":
+                target_jid = None
+            if target_jid is not None:
+                target_chat = database.get_chat(target_jid)
+                if not target_chat:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Target chat not found: {target_jid}",
+                    )
+            success = database.set_bot_response_chat_jid(bot_name, chat_jid, target_jid)
+            if not success:
+                raise HTTPException(
+                    status_code=400, detail="Failed to update response_chat_jid"
+                )
+            updates.append(f"response_chat_jid={target_jid}")
 
         if not updates:
             raise HTTPException(status_code=400, detail="No settings provided to update")
