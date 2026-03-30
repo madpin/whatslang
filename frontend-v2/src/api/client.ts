@@ -84,12 +84,40 @@ export type BotLogsData = {
 export type ChatMessage = {
   id?: string;
   from_me?: boolean;
+  is_from_me?: boolean;
   text?: string;
   body?: string;
+  content?: string;
   timestamp?: string | number;
   sender?: string;
+  sender_jid?: string;
+  from?: string;
   type?: string;
+  media_type?: string;
+  mimetype?: string;
 };
+
+export function messageText(msg: ChatMessage): string {
+  const t = msg.text ?? msg.body ?? msg.content;
+  if (t) return t;
+  const mediaType = msg.media_type ?? msg.mimetype?.split('/')[0];
+  if (mediaType) return `[${mediaType}]`;
+  if (msg.type && !['text', 'conversation', 'extendedTextMessage'].includes(msg.type)) {
+    return `[${msg.type}]`;
+  }
+  return '[message]';
+}
+
+export function messageIsMe(msg: ChatMessage): boolean {
+  return msg.from_me === true || msg.is_from_me === true;
+}
+
+export function isMediaMessage(msg: ChatMessage): boolean {
+  const text = msg.text ?? msg.body ?? msg.content;
+  if (!text && (msg.media_type || msg.mimetype)) return true;
+  if (msg.type && !['text', 'conversation', 'extendedTextMessage'].includes(msg.type ?? '')) return true;
+  return false;
+}
 
 export type BulkActionResult = {
   success: string[];
@@ -110,6 +138,12 @@ export async function fetchStats(): Promise<StatsResponse> {
 
 export async function fetchChats(params: URLSearchParams): Promise<ChatsListResponse | ChatRow[]> {
   const r = await apiFetch(`/chats?${params.toString()}`);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function fetchChat(chatJid: string): Promise<ChatRow> {
+  const r = await apiFetch(`/chats/${encodeURIComponent(chatJid)}`);
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }

@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   Search, ChevronDown, ChevronRight, Loader2, Plus, Trash2,
-  MessageSquare, ScrollText, SlidersHorizontal, X,
+  MessageSquare, ScrollText, SlidersHorizontal, X, RefreshCw,
+  CheckSquare, Square, Bot, Zap, ZapOff, Activity,
 } from 'lucide-react';
 import {
   fetchChats,
@@ -11,6 +12,7 @@ import {
   startBot as apiStartBot,
   stopBot as apiStopBot,
   updateBotSettings,
+  bulkAction as apiBulkAction,
   type ChatRow,
   type ChatsListResponse,
   type BotInfo,
@@ -21,6 +23,8 @@ import { BotLogsModal } from '../components/BotLogsModal';
 import { MessagesModal } from '../components/MessagesModal';
 import { Modal } from '../components/Modal';
 import { toast } from '../components/toastStore';
+
+const REFRESH_INTERVAL_MS = 30_000;
 
 function normalizeChats(
   data: ChatsListResponse | ChatRow[],
@@ -49,6 +53,12 @@ const TYPE_OPTIONS = [
   { value: '', label: 'All Types' },
   { value: 'group', label: 'Groups' },
   { value: 'individual', label: 'Individual' },
+];
+
+const BOT_STATUS_OPTIONS = [
+  { value: '', label: 'All Chats' },
+  { value: 'running', label: 'Has Running Bots' },
+  { value: 'stopped', label: 'No Running Bots' },
 ];
 
 function formatUptime(seconds: number): string {
@@ -217,6 +227,7 @@ export function Chats() {
   const [pagination, setPagination] = useState<ChatsListResponse['pagination']>();
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
 
   // Filters
   const [search, setSearch] = useState('');
@@ -224,15 +235,21 @@ export function Chats() {
   const [order] = useState('desc');
   const [activity, setActivity] = useState('');
   const [chatType, setChatType] = useState('');
+  const [botStatusFilter, setBotStatusFilter] = useState('');
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(20);
   const [showFilters, setShowFilters] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(false);
 
-  // Expanded state
+  // Expanded + bots state
   const [expandedJid, setExpandedJid] = useState<string | null>(null);
   const [chatBots, setChatBots] = useState<Record<string, BotInfo[]>>({});
   const [loadingBots, setLoadingBots] = useState<string | null>(null);
   const [togglingKey, setTogglingKey] = useState<string | null>(null);
+
+  // Bulk selection
+  const [selectedJids, setSelectedJids] = useState<Set<string>>(new Set());
+  const [bulkActioning, setBulkActioning] = useState(false);
 
   // Modals
   const [logsTarget, setLogsTarget] = useState<{ botName: string; displayName: string; chatJid: string } | null>(null);
@@ -257,6 +274,7 @@ export function Chats() {
       setChats(c);
       setPagination(p);
       setErr(null);
+      setLastRefreshed(new Date());
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Failed to load chats');
     } finally {
@@ -268,8 +286,24 @@ export function Chats() {
     loadChats();
   }, [loadChats]);
 
+  // Auto-refresh
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const id = setInterval(() => loadChats(), REFRESH_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [autoRefresh, loadChats]);
+
   // Reset to page 1 on filter change
   useEffect(() => { setPage(1); }, [search, sort, activity, chatType, perPage]);
+  // Clear selection on data change
+  useEffect(() => { setSelectedJids(new Set()); }, [chats]);
+
+  // Client-side bot status filter
+  const displayedChats = botStatusFilter === 'running'
+    ? chats.filter((c) => c.bots?.some((b) => b.status === 'running'))
+    : botStatusFilter === 'stopped'
+      ? chats.filter((c) => !c.bots?.some((b) => b.status === 'running'))
+      : chats;
 
   async function toggleChat(jid: string) {
     if (expandedJid === jid) {
@@ -340,10 +374,53 @@ export function Chats() {
       if (expandedJid === jid) setExpandedJid(null);
       setChatBots((prev) => { const n = { ...prev }; delete n[jid]; return n; });
       setChats((prev) => prev.filter((c) => c.chat_jid !== jid));
+      setSelectedJids((prev) => { const n = new Set(prev); n.delete(jid); return n; });
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Failed to delete chat', 'error');
     } finally {
       setDeletingJid(null);
+    }
+  }
+
+  // Bulk selection
+  function toggleSelectJid(jid: string) {
+    setSelectedJids((prev) => {
+      const n = new Set(prev);
+      if (n.has(jid)) n.delete(jid); else n.add(jid);
+      return n;
+    });
+  }
+
+  function selectAll() {
+    setSelectedJids(new Set(displayedChats.map((c) => c.chat_jid)));
+  }
+
+  function clearSelection() {
+    setSelectedJids(new Set());
+  }
+
+  const allSelected = displayedChats.length > 0 && selectedJids.size === displayedChats.length;
+  const someSelected = selectedJids.size > 0 && !allSelected;
+
+  async function handleBulkAction(action: string, botName?: string) {
+    const jids = Array.from(selectedJids);
+    if (!jids.length) return;
+    setBulkActioning(true);
+    try {
+      const result = await apiBulkAction(jids, action, botName);
+      toast(result.message || `${action} completed for ${result.success?.length ?? jids.length} chats`, 'success');
+      clearSelection();
+      loadChats();
+      // Invalidate bot caches for affected chats
+      setChatBots((prev) => {
+        const n = { ...prev };
+        jids.forEach((jid) => delete n[jid]);
+        return n;
+      });
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Bulk action failed', 'error');
+    } finally {
+      setBulkActioning(false);
     }
   }
 
@@ -352,7 +429,7 @@ export function Chats() {
     setPage(1);
   }
 
-  const hasActiveFilters = activity || chatType || sort !== 'last_message_time';
+  const hasActiveFilters = activity || chatType || sort !== 'last_message_time' || botStatusFilter;
   const totalPages = pagination?.total_pages ?? 1;
 
   if (err && chats.length === 0) {
@@ -368,7 +445,27 @@ export function Chats() {
       <div className="page-header">
         <h2>Chats</h2>
         {pagination && <span className="muted">{pagination.total} total</span>}
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          {lastRefreshed && (
+            <span className="refresh-indicator">{lastRefreshed.toLocaleTimeString()}</span>
+          )}
+          <button
+            type="button"
+            className={`btn secondary btn-sm ${autoRefresh ? 'auto-refresh-active' : ''}`}
+            onClick={() => setAutoRefresh((v) => !v)}
+            title={autoRefresh ? 'Disable auto-refresh' : 'Enable auto-refresh (30s)'}
+          >
+            <Activity size={13} className={autoRefresh ? 'spin-slow' : ''} />
+            {autoRefresh ? 'Auto' : 'Auto'}
+          </button>
+          <button
+            type="button"
+            className="btn secondary btn-sm"
+            onClick={() => loadChats()}
+            disabled={loading}
+          >
+            <RefreshCw size={13} className={loading ? 'spin' : ''} />
+          </button>
           <button
             type="button"
             className={`btn secondary btn-sm ${hasActiveFilters ? 'filter-active' : ''}`}
@@ -449,6 +546,18 @@ export function Chats() {
             </select>
           </div>
           <div className="filter-group">
+            <label className="filter-label">Bots</label>
+            <select
+              className="filter-select"
+              value={botStatusFilter}
+              onChange={(e) => setBotStatusFilter(e.target.value)}
+            >
+              {BOT_STATUS_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="filter-group">
             <label className="filter-label">Per page</label>
             <select
               className="filter-select"
@@ -464,7 +573,7 @@ export function Chats() {
             <button
               type="button"
               className="btn secondary btn-sm"
-              onClick={() => { setSort('last_message_time'); setActivity(''); setChatType(''); }}
+              onClick={() => { setSort('last_message_time'); setActivity(''); setChatType(''); setBotStatusFilter(''); }}
             >
               Reset
             </button>
@@ -474,45 +583,100 @@ export function Chats() {
 
       {loading && chats.length === 0 ? (
         <p className="muted">Loading chats…</p>
-      ) : chats.length === 0 ? (
+      ) : displayedChats.length === 0 ? (
         <div className="empty-state">
-          <p>
-            No chats found. Use <strong>Sync</strong> to import from WhatsApp or{' '}
-            <button type="button" className="link-btn" onClick={() => setShowAddChat(true)}>add one manually</button>.
-          </p>
+          {botStatusFilter ? (
+            <p>No chats match the bot status filter. <button type="button" className="link-btn" onClick={() => setBotStatusFilter('')}>Clear filter</button></p>
+          ) : (
+            <p>
+              No chats found. Use <strong>Sync</strong> to import from WhatsApp or{' '}
+              <button type="button" className="link-btn" onClick={() => setShowAddChat(true)}>add one manually</button>.
+            </p>
+          )}
         </div>
       ) : (
         <>
+          {/* Select-all row */}
+          <div className="select-all-row">
+            <button
+              type="button"
+              className="btn-icon-plain select-all-btn"
+              onClick={allSelected ? clearSelection : selectAll}
+              aria-label={allSelected ? 'Deselect all' : 'Select all'}
+              title={allSelected ? 'Deselect all' : 'Select all visible chats'}
+            >
+              {allSelected ? (
+                <CheckSquare size={16} style={{ color: 'var(--accent)' }} />
+              ) : someSelected ? (
+                <CheckSquare size={16} style={{ color: 'var(--text-muted)', opacity: 0.6 }} />
+              ) : (
+                <Square size={16} style={{ color: 'var(--text-muted)' }} />
+              )}
+            </button>
+            <span className="select-all-label">
+              {selectedJids.size > 0
+                ? `${selectedJids.size} selected`
+                : `${displayedChats.length} chat${displayedChats.length !== 1 ? 's' : ''}`}
+            </span>
+            {selectedJids.size > 0 && (
+              <button type="button" className="link-btn" onClick={clearSelection}>
+                Clear
+              </button>
+            )}
+          </div>
+
           <ul className="chat-list">
-            {chats.map((c) => {
+            {displayedChats.map((c) => {
               const isExpanded = expandedJid === c.chat_jid;
               const bots = chatBots[c.chat_jid];
               const isLoadingBots = loadingBots === c.chat_jid;
               const runningCount = c.bots?.filter((b) => b.status === 'running').length ?? 0;
               const isConfirmingDelete = confirmDeleteJid === c.chat_jid;
+              const isSelected = selectedJids.has(c.chat_jid);
 
               return (
-                <li key={c.chat_jid} className={`chat-row ${isExpanded ? 'chat-row-expanded' : ''}`}>
-                  <div className="chat-row-header" onClick={() => toggleChat(c.chat_jid)}>
-                    <div className="chat-row-expand">
-                      {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                    </div>
-                    <div className="chat-row-main">
-                      <span className="chat-name">{c.chat_name}</span>
-                      <span className="chat-jid">{c.chat_jid}</span>
-                    </div>
-                    <div className="chat-row-meta">
-                      {runningCount > 0 && (
-                        <span className="running-count">
-                          {runningCount} bot{runningCount !== 1 ? 's' : ''} active
-                        </span>
-                      )}
-                      {c.last_message_time && (
-                        <span className="last-activity">{formatTime(c.last_message_time)}</span>
-                      )}
-                      {c.message_count != null && c.message_count > 0 && (
-                        <span className="msg-count">{c.message_count.toLocaleString()} msgs</span>
-                      )}
+                <li key={c.chat_jid} className={`chat-row ${isExpanded ? 'chat-row-expanded' : ''} ${isSelected ? 'chat-row-selected' : ''}`}>
+                  <div className="chat-row-header">
+                    <button
+                      type="button"
+                      className="btn-icon-plain chat-checkbox-btn"
+                      onClick={(e) => { e.stopPropagation(); toggleSelectJid(c.chat_jid); }}
+                      aria-label={isSelected ? 'Deselect chat' : 'Select chat'}
+                    >
+                      {isSelected
+                        ? <CheckSquare size={15} style={{ color: 'var(--accent)' }} />
+                        : <Square size={15} style={{ color: 'var(--text-muted)' }} />}
+                    </button>
+                    <div
+                      className="chat-row-clickable"
+                      onClick={() => toggleChat(c.chat_jid)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => e.key === 'Enter' && toggleChat(c.chat_jid)}
+                    >
+                      <div className="chat-row-expand">
+                        {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                      </div>
+                      <div className="chat-row-main">
+                        <span className="chat-name">{c.chat_name}</span>
+                        <span className="chat-jid">{c.chat_jid}</span>
+                      </div>
+                      <div className="chat-row-meta">
+                        {runningCount > 0 && (
+                          <span className="running-count">
+                            {runningCount} bot{runningCount !== 1 ? 's' : ''} active
+                          </span>
+                        )}
+                        {c.last_message_time && (
+                          <span className="last-activity">{formatTime(c.last_message_time)}</span>
+                        )}
+                        {c.message_count != null && c.message_count > 0 && (
+                          <span className="msg-count">{c.message_count.toLocaleString()} msgs</span>
+                        )}
+                        {c.is_manual && (
+                          <span className="manual-badge">manual</span>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -640,6 +804,56 @@ export function Chats() {
         </>
       )}
 
+      {/* Bulk action toolbar */}
+      {selectedJids.size > 0 && (
+        <div className="bulk-toolbar" role="toolbar" aria-label="Bulk actions">
+          <span className="bulk-count">{selectedJids.size} selected</span>
+          <div className="bulk-actions">
+            <button
+              type="button"
+              className="btn primary btn-sm"
+              disabled={bulkActioning}
+              onClick={() => handleBulkAction('start_bots')}
+              title="Start all bots in selected chats"
+            >
+              <Zap size={13} /> Start Bots
+            </button>
+            <button
+              type="button"
+              className="btn secondary btn-sm"
+              disabled={bulkActioning}
+              onClick={() => handleBulkAction('stop_bots')}
+              title="Stop all bots in selected chats"
+            >
+              <ZapOff size={13} /> Stop Bots
+            </button>
+            <button
+              type="button"
+              className="btn secondary btn-sm btn-danger-ghost"
+              disabled={bulkActioning}
+              onClick={() => {
+                if (window.confirm(`Delete ${selectedJids.size} chat(s)? This cannot be undone.`)) {
+                  handleBulkAction('delete_chats');
+                }
+              }}
+              title="Delete selected chats"
+            >
+              <Trash2 size={13} /> Delete
+            </button>
+            <button
+              type="button"
+              className="btn-icon"
+              onClick={clearSelection}
+              aria-label="Clear selection"
+              title="Clear selection"
+            >
+              <X size={14} />
+            </button>
+          </div>
+          {bulkActioning && <Loader2 size={14} className="spin muted" />}
+        </div>
+      )}
+
       <AddChatModal
         isOpen={showAddChat}
         onClose={() => setShowAddChat(false)}
@@ -663,6 +877,14 @@ export function Chats() {
           chatJid={messagesTarget.chatJid}
           chatName={messagesTarget.chatName}
         />
+      )}
+
+      {/* Bot count legend */}
+      {chats.length > 0 && (
+        <div className="chats-legend">
+          <Bot size={12} />
+          <span>Expand a chat to manage its bots and settings</span>
+        </div>
       )}
     </div>
   );
