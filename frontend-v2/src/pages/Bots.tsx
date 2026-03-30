@@ -5,10 +5,10 @@ import {
   MessageSquare, Loader2, X,
 } from 'lucide-react';
 import {
-  fetchBotTypes, fetchRunningBots, fetchChats,
+  fetchBotTypes, fetchRunningBots, fetchAllChatsLightweight,
   stopBot as apiStopBot, startBot as apiStartBot,
   updateBotSettings,
-  type BotType, type BotInfo, type ChatRow, type ChatsListResponse,
+  type BotType, type BotInfo, type ChatSummary,
 } from '../api/client';
 import { StatusBadge } from '../components/StatusBadge';
 import { BotLogsModal } from '../components/BotLogsModal';
@@ -59,7 +59,7 @@ function CopyButton({ text }: { text: string }) {
 
 interface BotInstanceSettingsProps {
   bot: BotInfo;
-  allChats: ChatRow[];
+  allChats: ChatSummary[];
   onUpdate: (botName: string, chatJid: string, updates: Partial<BotInfo>) => void;
 }
 

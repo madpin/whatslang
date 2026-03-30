@@ -526,6 +526,23 @@ async def get_stats():
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
+@app.get("/chats/all")
+async def list_all_chats_lightweight():
+    """Return every chat's JID and name. Lightweight (no bot lookups)."""
+    try:
+        chats = database.list_chats(
+            sort_by="chat_name",
+            order="asc",
+        )
+        return [
+            {"chat_jid": c["chat_jid"], "chat_name": c["chat_name"]}
+            for c in chats
+        ]
+    except Exception as e:
+        logger.error(f"Error listing all chats: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 @app.get("/chats")
 async def list_chats(
     page: int = 1,

@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import {
   fetchChats,
+  fetchAllChatsLightweight,
   fetchBotsForChat,
   addChat as apiAddChat,
   deleteChat as apiDeleteChat,
@@ -14,6 +15,7 @@ import {
   updateBotSettings,
   bulkAction as apiBulkAction,
   type ChatRow,
+  type ChatSummary,
   type ChatsListResponse,
   type BotInfo,
 } from '../api/client';
@@ -88,7 +90,7 @@ function formatTime(ts: string | null | undefined): string {
 interface BotSettingsInlineProps {
   bot: BotInfo;
   chatJid: string;
-  allChats: ChatRow[];
+  allChats: ChatSummary[];
   onUpdate: (botName: string, updates: Partial<BotInfo>) => void;
 }
 
@@ -255,7 +257,7 @@ export function Chats() {
   const [autoRefresh, setAutoRefresh] = useState(false);
 
   // All chats (unfiltered) for "Forward to" dropdown
-  const [allChats, setAllChats] = useState<ChatRow[]>([]);
+  const [allChats, setAllChats] = useState<ChatSummary[]>([]);
 
   // Expanded + bots state
   const [expandedJid, setExpandedJid] = useState<string | null>(null);
@@ -306,10 +308,7 @@ export function Chats() {
   useEffect(() => {
     (async () => {
       try {
-        const params = new URLSearchParams({ per_page: '500', page: '1', sort: 'chat_name', order: 'asc' });
-        const data = await fetchChats(params);
-        const list = Array.isArray(data) ? data : ((data as ChatsListResponse).chats ?? []);
-        setAllChats(list);
+        setAllChats(await fetchAllChatsLightweight());
       } catch { /* silently fail -- dropdown will just be empty */ }
     })();
   }, []);

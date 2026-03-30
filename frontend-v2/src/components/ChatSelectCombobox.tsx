@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Search, X, ChevronDown } from 'lucide-react';
-import type { ChatRow } from '../api/client';
+
+export type ChatOption = { chat_jid: string; chat_name: string };
 
 interface ChatSelectComboboxProps {
-  chats: ChatRow[];
+  chats: ChatOption[];
   excludeJid?: string;
   value: string | null | undefined;
   disabled?: boolean;

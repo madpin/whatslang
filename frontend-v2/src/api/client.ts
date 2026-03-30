@@ -143,6 +143,14 @@ export async function fetchChats(params: URLSearchParams): Promise<ChatsListResp
   return r.json();
 }
 
+export type ChatSummary = Pick<ChatRow, 'chat_jid' | 'chat_name'>;
+
+export async function fetchAllChatsLightweight(): Promise<ChatSummary[]> {
+  const r = await apiFetch('/chats/all');
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
 export async function fetchChat(chatJid: string): Promise<ChatRow> {
   const r = await apiFetch(`/chats/${encodeURIComponent(chatJid)}`);
   if (!r.ok) throw new Error(await r.text());
