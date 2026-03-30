@@ -10,6 +10,7 @@ const REFRESH_INTERVAL = 30000; // 30 seconds
 const state = {
     chats: [],
     allChatsData: null, // Store the full API response with pagination info
+    allChatsForDropdown: [],
     expandedChats: new Set(),
     expandedLogs: new Set(),
     expandedMessages: new Set(),
@@ -113,6 +114,22 @@ async function authenticatedFetch(url, options = {}) {
 // INITIALIZATION
 // ===================================
 
+async function loadAllChatsForDropdown() {
+    try {
+        const params = new URLSearchParams({ per_page: '10000', page: '1', sort: 'chat_name', order: 'asc' });
+        const response = await authenticatedFetch(`${API_BASE_URL}/chats?${params}`);
+        if (!response.ok) return;
+        const data = await response.json();
+        if (Array.isArray(data)) {
+            state.allChatsForDropdown = data;
+        } else if (data && Array.isArray(data.chats)) {
+            state.allChatsForDropdown = data.chats;
+        }
+    } catch (error) {
+        console.debug('Failed to load all chats for dropdown:', error);
+    }
+}
+
 async function init() {
     console.log('🚀 Initializing modern dashboard...');
     
@@ -142,7 +159,7 @@ async function init() {
     
     setupEventListeners();
     restoreFiltersUI();
-    await loadChats();
+    await Promise.all([loadChats(), loadAllChatsForDropdown()]);
     startAutoRefresh();
     updateDashboardStats();
 }
@@ -504,6 +521,7 @@ async function loadChats() {
         await updateDashboardStats();
         updateFilterInfo();
         hideLoading();
+        loadAllChatsForDropdown();
         return true;
         
     } catch (error) {
@@ -1236,7 +1254,7 @@ async function updateResponseChat(botName, chatJid, targetJid) {
 }
 
 function buildForwardToOptions(currentChatJid, selectedJid) {
-    const chats = state.chats || [];
+    const chats = state.allChatsForDropdown.length > 0 ? state.allChatsForDropdown : (state.chats || []);
     let options = '<option value="">Same chat</option>';
     chats.forEach(chat => {
         if (chat.chat_jid !== currentChatJid) {

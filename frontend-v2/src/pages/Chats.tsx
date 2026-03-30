@@ -87,15 +87,16 @@ function formatTime(ts: string | null | undefined): string {
 interface BotSettingsInlineProps {
   bot: BotInfo;
   chatJid: string;
+  allChats: ChatRow[];
   onUpdate: (botName: string, updates: Partial<BotInfo>) => void;
 }
 
-function BotSettingsInline({ bot, chatJid, onUpdate }: BotSettingsInlineProps) {
+function BotSettingsInline({ bot, chatJid, allChats, onUpdate }: BotSettingsInlineProps) {
   const [contextVal, setContextVal] = useState(String(bot.context_message_count ?? 0));
   const [saving, setSaving] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  async function saveSettings(patch: { answer_owner_messages?: boolean; context_message_count?: number }) {
+  async function saveSettings(patch: { answer_owner_messages?: boolean; context_message_count?: number; response_chat_jid?: string | null }) {
     setSaving(true);
     try {
       await updateBotSettings(bot.name, chatJid, patch);
@@ -148,6 +149,29 @@ function BotSettingsInline({ bot, chatJid, onUpdate }: BotSettingsInlineProps) {
           title="Number of previous messages to include as context"
         />
         <span className="setting-label">msgs</span>
+      </label>
+      <label className="setting-item">
+        <span className="setting-label">Forward to</span>
+        <select
+          className="setting-input"
+          value={bot.response_chat_jid ?? ''}
+          disabled={saving}
+          onChange={(e) => {
+            const val = e.target.value || null;
+            saveSettings({ response_chat_jid: val });
+          }}
+          aria-label="Forward response to another chat"
+          title="Forward original message and bot response to another chat"
+        >
+          <option value="">Same chat</option>
+          {allChats
+            .filter((c) => c.chat_jid !== chatJid)
+            .map((c) => (
+              <option key={c.chat_jid} value={c.chat_jid}>
+                {c.chat_name || c.chat_jid.split('@')[0]}
+              </option>
+            ))}
+        </select>
       </label>
       {saving && <Loader2 size={12} className="spin muted" />}
     </div>
@@ -241,6 +265,9 @@ export function Chats() {
   const [showFilters, setShowFilters] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(false);
 
+  // All chats (unfiltered) for "Forward to" dropdown
+  const [allChats, setAllChats] = useState<ChatRow[]>([]);
+
   // Expanded + bots state
   const [expandedJid, setExpandedJid] = useState<string | null>(null);
   const [chatBots, setChatBots] = useState<Record<string, BotInfo[]>>({});
@@ -285,6 +312,18 @@ export function Chats() {
   useEffect(() => {
     loadChats();
   }, [loadChats]);
+
+  // Fetch full (unfiltered) chat list for "Forward to" dropdowns
+  useEffect(() => {
+    (async () => {
+      try {
+        const params = new URLSearchParams({ per_page: '500', page: '1', sort: 'chat_name', order: 'asc' });
+        const data = await fetchChats(params);
+        const list = Array.isArray(data) ? data : ((data as ChatsListResponse).chats ?? []);
+        setAllChats(list);
+      } catch { /* silently fail -- dropdown will just be empty */ }
+    })();
+  }, []);
 
   // Auto-refresh
   useEffect(() => {
@@ -723,6 +762,7 @@ export function Chats() {
                                 <BotSettingsInline
                                   bot={b}
                                   chatJid={c.chat_jid}
+                                  allChats={allChats}
                                   onUpdate={(botName, updates) => handleBotSettingsUpdate(c.chat_jid, botName, updates)}
                                 />
                               </li>
