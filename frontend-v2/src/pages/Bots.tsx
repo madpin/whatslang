@@ -146,7 +146,7 @@ interface StartBotPanelProps {
 }
 
 function StartBotPanel({ botName, existingJids, onStarted }: StartBotPanelProps) {
-  const [chats, setChats] = useState<ChatRow[]>([]);
+  const [chats, setChats] = useState<ChatSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedJid, setSelectedJid] = useState('');
   const [starting, setStarting] = useState(false);
@@ -154,9 +154,7 @@ function StartBotPanel({ botName, existingJids, onStarted }: StartBotPanelProps)
   useEffect(() => {
     (async () => {
       try {
-        const params = new URLSearchParams({ per_page: '200', page: '1', sort: 'chat_name', order: 'asc' });
-        const data = await fetchChats(params);
-        const list = Array.isArray(data) ? data : (data.chats ?? []);
+        const list = await fetchAllChatsLightweight();
         setChats(list.filter((c) => !existingJids.includes(c.chat_jid)));
       } catch {
         /* silently fail */
@@ -229,7 +227,7 @@ function StartBotPanel({ botName, existingJids, onStarted }: StartBotPanelProps)
 export function Bots() {
   const [types, setTypes] = useState<BotType[]>([]);
   const [running, setRunning] = useState<BotInfo[]>([]);
-  const [allChats, setAllChats] = useState<ChatRow[]>([]);
+  const [allChats, setAllChats] = useState<ChatSummary[]>([]);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -245,11 +243,9 @@ export function Bots() {
   const load = useCallback(async (isManual = false) => {
     if (isManual) setRefreshing(true);
     try {
-      const chatParams = new URLSearchParams({ per_page: '500', page: '1', sort: 'chat_name', order: 'asc' });
-      const [t, r, chatData] = await Promise.all([fetchBotTypes(), fetchRunningBots(), fetchChats(chatParams)]);
+      const [t, r, chatList] = await Promise.all([fetchBotTypes(), fetchRunningBots(), fetchAllChatsLightweight()]);
       setTypes(t);
       setRunning(r);
-      const chatList = Array.isArray(chatData) ? chatData : ((chatData as ChatsListResponse).chats ?? []);
       setAllChats(chatList);
       setErr(null);
       setLastRefreshed(new Date());

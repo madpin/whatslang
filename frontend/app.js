@@ -116,14 +116,11 @@ async function authenticatedFetch(url, options = {}) {
 
 async function loadAllChatsForDropdown() {
     try {
-        const params = new URLSearchParams({ per_page: '10000', page: '1', sort: 'chat_name', order: 'asc' });
-        const response = await authenticatedFetch(`${API_BASE_URL}/chats?${params}`);
+        const response = await authenticatedFetch(`${API_BASE_URL}/chats/all`);
         if (!response.ok) return;
         const data = await response.json();
         if (Array.isArray(data)) {
             state.allChatsForDropdown = data;
-        } else if (data && Array.isArray(data.chats)) {
-            state.allChatsForDropdown = data.chats;
         }
     } catch (error) {
         console.debug('Failed to load all chats for dropdown:', error);
