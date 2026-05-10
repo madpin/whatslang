@@ -6,29 +6,19 @@
     "node": "22"
   },
   "caches": {
-    "npm-install": { "directory": "/root/.npm", "type": "shared" },
-    "npm-build":   { "directory": "/app/web/node_modules", "type": "shared" }
+    "npm-install": { "directory": "/root/.npm", "type": "shared" }
   },
   "steps": {
-    "frontend:install": {
-      "inputs": [
-        { "step": "packages:mise" },
-        { "local": true, "include": ["web/package.json", "web/package-lock.json"] }
-      ],
-      "caches": ["npm-install", "npm-build"],
-      "commands": [
-        { "cmd": "cd web && npm ci --no-audit --no-fund", "customName": "Install web deps" }
-      ]
-    },
     "frontend:build": {
       "inputs": [
-        { "step": "frontend:install" },
+        { "step": "packages:mise" },
         { "local": true, "include": ["web"] }
       ],
-      "caches": ["npm-build"],
+      "caches": ["npm-install"],
       "commands": [
-        { "cmd": "cd web && npm run build", "customName": "Build SPA" },
-        { "cmd": "test -f web/dist/index.html", "customName": "Verify SPA bundle" }
+        "cd web && npm ci --no-audit --no-fund",
+        "cd web && npm run build",
+        "test -f web/dist/index.html"
       ]
     }
   },
