@@ -80,6 +80,8 @@ legacy.py
 # Node (if any)
 node_modules/
 npm-debug.log
+web/node_modules/
+web/dist/
 
 # OS files
 Thumbs.db

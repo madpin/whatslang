@@ -1,0 +1,49 @@
+{
+  "$schema": "https://schema.railpack.com",
+  "provider": "python",
+  "packages": {
+    "python": "3.11",
+    "node": "22"
+  },
+  "caches": {
+    "npm-install": { "directory": "/root/.npm", "type": "shared" },
+    "npm-build":   { "directory": "/app/web/node_modules", "type": "shared" }
+  },
+  "steps": {
+    "frontend:install": {
+      "inputs": [
+        { "step": "packages:mise" },
+        { "local": true, "include": ["web/package.json", "web/package-lock.json"] }
+      ],
+      "caches": ["npm-install", "npm-build"],
+      "commands": [
+        { "cmd": "cd web && npm ci --no-audit --no-fund", "customName": "Install web deps" }
+      ]
+    },
+    "frontend:build": {
+      "inputs": [
+        { "step": "frontend:install" },
+        { "local": true, "include": ["web"] }
+      ],
+      "caches": ["npm-build"],
+      "commands": [
+        { "cmd": "cd web && npm run build", "customName": "Build SPA" },
+        { "cmd": "test -f web/dist/index.html", "customName": "Verify SPA bundle" }
+      ]
+    }
+  },
+  "deploy": {
+    "aptPackages": ["ffmpeg", "curl", "ca-certificates"],
+    "inputs": [
+      "...",
+      { "step": "frontend:build", "include": ["web/dist"] }
+    ],
+    "variables": {
+      "PYTHONUNBUFFERED": "1",
+      "PYTHONDONTWRITEBYTECODE": "1",
+      "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+      "DB_PATH": "/data/messages.db"
+    },
+    "startCommand": "python -m uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips '*'"
+  }
+}

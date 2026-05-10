@@ -1,545 +1,206 @@
-# WhatsApp Bot Service
+# Whatslang
 
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.109-green.svg)](https://fastapi.tiangolo.com/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+A modular WhatsApp bot service with a sleek admin console, a declarative bot
+framework, and a single-user, env-driven login. Built on FastAPI, SQLite, and
+a Vite/React/TypeScript dashboard.
 
-A production-ready, modular WhatsApp bot service with a web dashboard for managing multiple concurrent bots. Built with FastAPI and designed for easy deployment with Docker and Nixpacks (dokploy).
-
----
-
-## 📖 New to the Project?
-
-👉 **[Start with the Documentation Hub](docs/README.md)** 👈
-
-The hub provides structured learning paths from beginner to advanced, with guides for:
-- 🚀 Getting started (15 min)
-- 🤖 Creating custom bots (30 min)  
-- 🔐 Adding security (15 min)
-- ☁️ Production deployment (45 min)
-
----
-
-## ✨ Features
-
-- 🤖 **Multiple Bots**: Run multiple bots simultaneously on the same WhatsApp chat
-- 📊 **Web Dashboard**: Beautiful UI for starting, stopping, and monitoring bots
-- 📝 **Real-time Logs**: Live log streaming for each bot
-- 🔧 **Modular Architecture**: Easy to create and add new bots
-- 🐳 **Docker Ready**: Production-ready Docker configuration
-- ☁️ **Cloud Native**: Deploy to dokploy, Kubernetes, or any container platform
-- 🔒 **Secure**: Environment-based configuration, no hardcoded secrets
-- 📈 **Production Features**: Health checks, structured logging, graceful shutdown
-
-## 🚀 Quick Start
-
-### Prerequisites
-
-- Python 3.10 or higher
-- WhatsApp API endpoint (e.g., [go-whatsapp-web-multidevice](https://github.com/aldinokemal/go-whatsapp-web-multidevice))
-- OpenAI API key or LiteLLM endpoint
-
-### Local Development
-
-1. **Clone the repository**
-
-```bash
-git clone https://github.com/yourusername/whatslang.git
-cd whatslang
+```
+┌────────────────────┐      ┌──────────────────────┐      ┌────────────────┐
+│  WhatsApp Gateway  │ ◀──▶ │  Whatslang Backend   │ ◀──▶ │  React Console │
+│  (whatsapp-mcp)    │      │  (FastAPI · SQLite)  │      │  (Vite/Tailwind)│
+└────────────────────┘      └──────────┬───────────┘      └────────────────┘
+                                       │
+                                       ▼
+                              ┌──────────────────┐
+                              │   LLM (OpenAI    │
+                              │   / LiteLLM)     │
+                              └──────────────────┘
 ```
 
-2. **Set up virtual environment**
+## Highlights
+
+- **Sleek admin console** — dashboard, chats, bots, settings, dark/light themes,
+  toasts, modals, search, filters, pagination.
+- **Declarative bots** — adding a bot is a few-line `BotSpec` in
+  `app/bots/__init__.py`. No more wiring threads, polling loops, or media
+  pipelines by hand.
+- **Multimodal out of the box** — text, image (vision), audio (Whisper), and
+  video → audio transcription handled in one place.
+- **Multiple bots per chat** — start and stop any combination of bots in any
+  chat, with independent settings (context size, self-answer, redirect target).
+- **Single-user auth** — username and password are env vars; sessions are
+  HMAC-signed cookies. Leave both empty to disable auth on private networks.
+- **One container, two stages** — Vite builds the SPA, FastAPI serves it from
+  `/web/dist`. No Nginx required.
+
+## Quick start
+
+### 1. Configure
 
 ```bash
-# Create virtual environment
+cp .env.example .env
+$EDITOR .env
+```
+
+At minimum you need a `WHATSAPP_BASE_URL` and an `OPENAI_API_KEY` (or any
+LiteLLM-compatible endpoint via `OPENAI_BASE_URL`). To enable the dashboard
+login, set both `DASHBOARD_USER` and `DASHBOARD_PASSWORD`.
+
+### 2. Backend (Python 3.10+)
+
+```bash
 python3 -m venv .venv
-
-# Activate it
-source .venv/bin/activate  # On Linux/Mac
-# or
-.venv\Scripts\activate     # On Windows
-
-# Or use the Makefile
-make venv                  # Creates .venv
-source .venv/bin/activate  # Then activate it
-```
-
-3. **Install dependencies**
-
-```bash
-# Install production dependencies
+source .venv/bin/activate
 pip install -r requirements.txt
-
-# Or use the Makefile (requires active venv)
-make install               # Checks for venv first
-
-# For development (includes testing/linting tools)
-make install-dev
+python -m app           # http://localhost:8000
 ```
 
-4. **Configure environment variables**
+API docs live at `http://localhost:8000/api/docs` when
+`ENVIRONMENT=development`.
+
+### 3. Frontend (Node 20+)
 
 ```bash
-cp env.example .env
-# Edit .env with your actual credentials
+cd web
+npm install
+npm run dev             # http://localhost:5173 (proxies /api to :8000)
 ```
 
-5. **Run the service**
+For production, run `npm run build` once — the FastAPI app picks up
+`web/dist/` automatically and serves the SPA + assets.
+
+## Docker
 
 ```bash
-python run.py
+docker compose up --build
 ```
 
-6. **Access the dashboard**
+The compose file mounts a `whatslang-data` volume to `/data` so SQLite state
+survives upgrades. Healthchecks hit `/health`.
 
-Open http://localhost:8000/static/index.html in your browser (classic dashboard).
+## PaaS deployments (Nixpacks / Railpack)
 
-The beta UI (Vite + React) is served at **http://localhost:8000/v2/** — same API, same auth. Use the sidebar link in the classic UI to switch. With no password set, you can set `DASHBOARD_DEFAULT_UI=v2` so `/` redirects to `/v2/` instead of the classic index.
+The repo ships with both build plans — pick whichever your platform speaks. No
+extra service, no buildpacks: a single image that builds the SPA, installs
+Python deps, then runs uvicorn.
 
-## 🐳 Docker Deployment
+| Platform                     | Use                |
+|------------------------------|--------------------|
+| Dokploy, Coolify, older Railway | `nixpacks.toml` |
+| Railway (modern), self-hosted Railpack | `railpack.json` |
 
-### Using Docker Compose (Recommended)
+### Nixpacks (`nixpacks.toml`)
 
-1. **Create .env file** with your configuration:
+- Setup: Python 3.11, Node 22, ffmpeg, curl, CA certs (pinned nixpkgs).
+- Install: `pip install -r requirements.txt` into `/opt/venv` (cached).
+- Build: `cd web && npm ci && npm run build` (npm + node_modules cached).
+- Start: `python -m uvicorn app.main:app …` from the venv.
 
-```bash
-cp env.example .env
-# Edit .env with your credentials
-```
+### Railpack (`railpack.json`)
 
-2. **Start the service**:
+- Provider: `python` (auto-detects `requirements.txt`).
+- Packages: `python 3.11` + `node 22` via mise.
+- Custom steps: `frontend:install` → `frontend:build` (with `npm` cache layers).
+- Deploy: `web/dist` is layered on top of the Python deploy image, plus
+  `ffmpeg` / `curl` / `ca-certificates` as runtime apt packages.
+- Start: `python -m uvicorn app.main:app …`.
 
-```bash
-docker-compose up -d
-```
+### Required env vars (both)
 
-3. **View logs**:
+Provide the variables from `.env.example`:
 
-```bash
-docker-compose logs -f
-```
+- `WHATSAPP_BASE_URL`, `WHATSAPP_API_USER`, `WHATSAPP_API_PASSWORD`, `DEVICE_ID`
+- `OPENAI_API_KEY` (and optionally `OPENAI_BASE_URL`, model overrides)
+- `DASHBOARD_USER`, `DASHBOARD_PASSWORD`, `SESSION_SECRET` (set the secret to a
+  long random string so cookies survive restarts)
+- `DB_PATH=/data/messages.db` and a writable persistent volume mounted at
+  `/data`
 
-4. **Stop the service**:
+### Healthcheck
 
-```bash
-docker-compose down
-```
+Both plans serve `GET /health` (and `/api/health`) returning `200 OK` once the
+app is up — wire it up as the platform's healthcheck.
 
-### Using Docker directly
+## Adding a new bot
 
-```bash
-# Build the image
-docker build -t whatslang:latest .
-
-# Run the container
-docker run -d \
-  --name whatslang \
-  -p 8000:8000 \
-  -e WHATSAPP_BASE_URL=your-url \
-  -e WHATSAPP_API_USER=your-user \
-  -e WHATSAPP_API_PASSWORD=your-password \
-  -e CHAT_JID=your-chat-jid \
-  -e OPENAI_API_KEY=your-key \
-  -v whatslang-data:/data \
-  whatslang:latest
-```
-
-## ☁️ Dokploy Deployment (Nixpacks)
-
-Dokploy automatically detects and uses the `nixpacks.toml` configuration.
-
-### Deployment Steps
-
-1. **Create a new application** in Dokploy
-
-2. **Connect your Git repository**
-
-3. **Set environment variables** in Dokploy dashboard:
-   - `WHATSAPP_BASE_URL`
-   - `WHATSAPP_API_USER`
-   - `WHATSAPP_API_PASSWORD`
-   - `CHAT_JID`
-   - `OPENAI_API_KEY`
-   - `OPENAI_BASE_URL` (optional)
-   - `OPENAI_MODEL` (optional)
-   - `ENVIRONMENT=production`
-
-4. **Add persistent storage** (recommended):
-   - Mount path: `/data`
-   - This persists the message database
-
-5. **Deploy** - Dokploy will:
-   - Detect Nixpacks configuration
-   - Build using Python 3.11 and install dependencies
-   - Run `npm ci && npm run build` in `frontend-v2/` (beta dashboard at `/v2/`)
-   - Start the service on port 8000
-
-6. **Configure health checks**:
-   - Liveness: `GET /health`
-   - Readiness: `GET /ready`
-
-If the image build fails because `nodejs_20` is not found in Nixpacks’ nixpkgs snapshot, change `nixpacks.toml` to use another Node package name your channel provides (for example `nodejs` or `nodejs_22`).
-
-## 💾 Data Persistence
-
-All persistent data is stored in the `/data` directory (inside containers) or `./data/` (local development).
-
-### What is Persisted?
-
-- **Database** (`messages.db`) - Chat history, bot assignments, processed messages
-- **Future assets** - Logs, cached data, uploads, etc.
-
-### Dokploy Volume Setup
-
-In Dokploy's volume configuration:
-- **Container Path**: `/data`
-- **Host Path**: `/var/lib/dokploy/volumes/whatslang/data` (or your preferred location)
-- **Mode**: `rw` (read-write)
-
-This ensures your data survives redeployments, updates, and container restarts.
-
-### Backup & Restore
-
-```bash
-# Backup
-docker exec whatslang-bot-service sqlite3 /data/messages.db .dump > backup.sql
-
-# Restore
-cat backup.sql | docker exec -i whatslang-bot-service sqlite3 /data/messages.db
-```
-
-**📖 For detailed persistence documentation**, see [PERSISTENCE.md](docs/PERSISTENCE.md)
-
-## 📋 Architecture
-
-```
-whatslang/
-├── api/                    # FastAPI backend
-│   ├── main.py            # Main application with health checks
-│   ├── bot_manager.py     # Bot lifecycle management
-│   └── models.py          # API data models
-├── bots/                  # Bot implementations
-│   ├── translation_bot.py # Portuguese ↔ English translation
-│   └── joke_bot.py        # Joke generator bot
-├── core/                  # Shared infrastructure
-│   ├── bot_base.py        # Base class for all bots
-│   ├── whatsapp_client.py # WhatsApp API wrapper
-│   ├── database.py        # SQLite message tracking
-│   └── llm_service.py     # LLM API wrapper
-├── data/                  # Persistent data (gitignored)
-│   └── messages.db        # SQLite database
-├── docs/                  # Documentation
-│   ├── README.md          # Documentation index
-│   ├── QUICKSTART.md      # Quick start guide
-│   ├── DEPLOYMENT.md      # Deployment guide
-│   ├── PERSISTENCE.md     # Data persistence guide
-│   └── dev-notes/         # Development notes
-├── frontend/              # Web dashboard (classic)
-│   ├── index.html         # Dashboard UI
-│   ├── app.js            # Frontend logic
-│   └── styles.css        # Styling
-├── frontend-v2/           # Beta dashboard (Vite + React, built to dist/)
-│   ├── package.json
-│   └── src/               # App source
-├── Dockerfile            # Multi-stage Docker build
-├── docker-compose.yml    # Docker Compose configuration
-├── nixpacks.toml         # Nixpacks/Dokploy configuration
-├── pyproject.toml        # Python project metadata
-├── requirements.txt      # Python dependencies
-├── env.example          # Environment variables template
-└── run.py               # Simple run script
-```
-
-## 🤖 Available Bots
-
-### Translation Bot
-- **Prefix**: `[ai]`
-- **Function**: Translates messages between Portuguese and English
-- Auto-detects source language
-- Responds only to non-bot messages
-
-### Joke Bot
-- **Prefix**: `[joke]`
-- **Function**: Responds with family-friendly jokes
-- Generates contextual humor
-- Responds only to non-bot messages
-
-## 🛠️ Creating Custom Bots
-
-Create a new file in `bots/` directory (e.g., `my_bot.py`):
+Edit `app/bots/__init__.py` and append a `BotSpec`:
 
 ```python
-from typing import Dict, Any, Optional
-from core.bot_base import BotBase
-
-class MyBot(BotBase):
-    """Description of what your bot does."""
-    
-    NAME = "my_bot"         # Unique identifier
-    PREFIX = "[mybot]"       # Prefix for bot messages
-    
-    def process_message(self, message: Dict[str, Any]) -> Optional[str]:
-        """
-        Process a message and return a response.
-        
-        Args:
-            message: Message dict from WhatsApp API
-        
-        Returns:
-            Response text, or None to skip
-        """
-        msg_text = message.get("content", "")
-        
-        # Your bot logic here
-        prompt = "Your LLM prompt here"
-        response = self.llm.call(prompt, msg_text)
-        
-        return response
+BotSpec(
+    name="echo",
+    label="Echo",
+    prefix="!echo ",
+    emoji="🔁",
+    description="Repeats whatever you say.",
+    text_prompt="You are a polite echo. Repeat the user's text verbatim.",
+    image_mode=MediaMode.IGNORE,
+    audio_mode=MediaMode.IGNORE,
+    video_mode=MediaMode.IGNORE,
+    answer_owner_messages_default=False,
+)
 ```
 
-Restart the service - your bot will automatically appear in the dashboard!
+Restart the server. The new bot shows up in the dashboard, can be assigned to
+any chat, and supports per-chat configuration (context size, self-answer,
+response redirection).
 
-## 🔧 Configuration
+## Project layout
 
-### Environment Variables
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `WHATSAPP_BASE_URL` | Yes | - | WhatsApp API endpoint URL |
-| `WHATSAPP_API_USER` | Yes | - | WhatsApp API username |
-| `WHATSAPP_API_PASSWORD` | Yes | - | WhatsApp API password |
-| `CHAT_JID` | Yes | - | WhatsApp chat/group JID |
-| `OPENAI_API_KEY` | Yes | - | OpenAI or LiteLLM API key |
-| `OPENAI_BASE_URL` | No | `https://api.openai.com/v1` | LLM API endpoint |
-| `OPENAI_MODEL` | No | `gpt-4` | LLM model name |
-| `POLL_INTERVAL` | No | `5` | Message polling interval (seconds) |
-| `DB_PATH` | No | `data/messages.db` | SQLite database path |
-| `HOST` | No | `0.0.0.0` | Server host |
-| `PORT` | No | `8000` | Server port |
-| `LOG_LEVEL` | No | `INFO` | Logging level |
-| `ENVIRONMENT` | No | `development` | Environment (development/production) |
-
-### Legacy config.yaml Support
-
-For backward compatibility, you can still use `config.yaml`. Environment variables take precedence.
-
-## 📊 API Endpoints
-
-### Health & Status
-
-- `GET /` - API information
-- `GET /health` - Liveness probe (container health)
-- `GET /ready` - Readiness probe (service ready to accept requests)
-
-### Bot Management
-
-- `GET /bots` - List all bots with status
-- `GET /bots/{bot_name}/status` - Get specific bot status
-- `POST /bots/{bot_name}/start` - Start a bot
-- `POST /bots/{bot_name}/stop` - Stop a bot
-- `GET /bots/{bot_name}/logs` - Get bot logs (limit parameter supported)
-
-### Documentation
-
-- `GET /docs` - Interactive API documentation (Swagger UI)
-- `GET /redoc` - Alternative API documentation (ReDoc)
-
-*Note: API docs are disabled in production mode for security*
-
-## 📈 Production Features
-
-### Health Checks
-
-- **Liveness**: `/health` - Returns 200 if service is running
-- **Readiness**: `/ready` - Returns 200 if service is ready to handle requests
-
-Configure in Kubernetes/Dokploy:
-
-```yaml
-livenessProbe:
-  httpGet:
-    path: /health
-    port: 8000
-  initialDelaySeconds: 30
-  periodSeconds: 10
-
-readinessProbe:
-  httpGet:
-    path: /ready
-    port: 8000
-  initialDelaySeconds: 5
-  periodSeconds: 5
+```
+app/
+  config.py            pydantic-settings config
+  logging_setup.py     pretty/JSON logging
+  db.py                SQLite repository (compatible with old schema)
+  auth.py              HMAC-signed session cookies
+  schemas.py           Pydantic request/response models
+  deps.py              FastAPI dependency providers
+  main.py              app factory + SPA mount + lifespan
+  routers/
+    auth.py
+    bots.py
+    chats.py
+    system.py
+  services/
+    whatsapp.py        WhatsApp gateway client
+    llm.py             OpenAI / LiteLLM client (text/vision/audio)
+    bot_manager.py     Bot lifecycle + ring buffer logs
+  bots/
+    base.py            BotSpec, MediaMode, generic BotRunner
+    __init__.py        Declarative catalog
+web/
+  src/
+    api/               typed fetch client + endpoints
+    components/        AppShell, Sidebar, TopBar, primitives
+    lib/               theme, toast, auth context, utils
+    pages/             Dashboard, Chats, ChatDetail, Bots, Settings, Login
 ```
 
-### Structured Logging
+## Auth model
 
-- **Development**: Human-readable formatted logs
-- **Production**: JSON structured logs for log aggregation (ELK, Datadog, etc.)
+- Both `DASHBOARD_USER` and `DASHBOARD_PASSWORD` set → login required.
+- Either empty → auth disabled (handy for trusted networks or other proxies).
+- `SESSION_SECRET` is used to HMAC-sign cookies. Leave blank to auto-generate
+  on boot (sessions invalidate on restart in that case).
 
-### Graceful Shutdown
+## Endpoints
 
-- Automatically stops all running bots on shutdown
-- Handles SIGTERM signals properly
-- Safe for container orchestration
+| Method | Path                              | Purpose                          |
+|--------|-----------------------------------|----------------------------------|
+| GET    | `/api/health`, `/health`          | Liveness                         |
+| GET    | `/api/system`                     | Runtime configuration snapshot   |
+| GET    | `/api/stats`                      | Dashboard KPIs                   |
+| POST   | `/api/auth/login`, `/logout`      | Session management               |
+| GET    | `/api/auth/status`                | Current auth state               |
+| GET    | `/api/bots/types`, `/api/bots`    | Catalog and running instances    |
+| POST   | `/api/bots/{name}/start`,`/stop`  | Per-chat lifecycle               |
+| PUT    | `/api/bots/{name}/settings`       | Per-chat tuning                  |
+| GET    | `/api/bots/{name}/logs`           | Ring-buffer logs                 |
+| GET    | `/api/chats`, `/api/chats/all`    | Filterable list / brief list     |
+| POST   | `/api/chats`, `/api/chats/sync`   | Add manually / sync from gateway |
+| POST   | `/api/chats/bulk`                 | Bulk start/stop/delete           |
+| GET    | `/api/chats/{jid}`                | Chat with bot statuses           |
+| DELETE | `/api/chats/{jid}`                | Remove + stop bots               |
 
-### Security
+## License
 
-- Non-root user in Docker container
-- No hardcoded secrets
-- Environment-based configuration
-- CORS configurable via `ALLOWED_ORIGINS`
-
-## 🔍 Monitoring
-
-### Built-in Metrics
-
-The `/ready` endpoint provides service metrics:
-
-```json
-{
-  "status": "ready",
-  "services": {
-    "whatsapp": "connected",
-    "llm": "connected",
-    "database": "connected",
-    "bot_manager": "initialized"
-  },
-  "bots": {
-    "available": 2,
-    "running": 1
-  }
-}
-```
-
-### Logs
-
-Access logs via:
-
-```bash
-# Docker Compose
-docker-compose logs -f
-
-# Docker
-docker logs -f whatslang
-
-# Dokploy
-Check the logs tab in Dokploy dashboard
-```
-
-## 🐛 Troubleshooting
-
-### Bots not responding?
-
-1. Check logs in the dashboard or container logs
-2. Verify WhatsApp API credentials
-3. Ensure `CHAT_JID` is correct
-4. Check that messages don't start with `[*]` (reserved for bot messages)
-
-### LLM errors?
-
-1. Verify `OPENAI_API_KEY` is valid
-2. Check `OPENAI_BASE_URL` is accessible
-3. Ensure `OPENAI_MODEL` name is correct
-4. Review error messages in logs
-
-### Frontend not loading?
-
-1. Ensure service is running: `curl http://localhost:8000/health`
-2. Check browser console for errors
-3. Verify `/bots` endpoint returns JSON: `curl http://localhost:8000/bots`
-
-### Database errors?
-
-1. Ensure `/data` directory is writable
-2. Check persistent volume is mounted (Docker/Kubernetes)
-3. Verify `DB_PATH` is accessible
-
-## 🧪 Development
-
-### Running Tests
-
-```bash
-# Install dev dependencies
-pip install -e ".[dev]"
-
-# Run tests
-pytest
-
-# With coverage
-pytest --cov
-```
-
-### Code Formatting
-
-```bash
-# Format code
-black .
-
-# Lint
-ruff check .
-
-# Type checking
-mypy .
-```
-
-## 📄 License
-
-MIT License - see LICENSE file for details
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 📚 Documentation
-
-### 🎯 Choose Your Path
-
-| I want to... | Read this | Time |
-|--------------|-----------|------|
-| 🚀 **Get started from scratch** | [Getting Started Guide](docs/GETTING_STARTED.md) | 15 min |
-| ⚡ **Quick setup (experienced users)** | [Quick Start](docs/QUICKSTART.md) | 5 min |
-| 🤖 **Create custom bots** | [Creating Bots Guide](docs/CREATING_BOTS.md) | 30 min |
-| 🔐 **Add password protection** | [Security Guide](docs/SECURITY.md) | 15 min |
-| ☁️ **Deploy to production** | [Deployment Guide](docs/DEPLOYMENT.md) | 45 min |
-| 💾 **Understand data storage** | [Persistence Guide](docs/PERSISTENCE.md) | 20 min |
-| 🐍 **Learn about virtual envs** | [Venv Guide](docs/VENV_GUIDE.md) | 10 min |
-
-### 📖 Complete Documentation Hub
-
-**For the complete documentation with learning paths and detailed guides:**
-
-👉 **[Visit the Documentation Hub](docs/README.md)** 👈
-
-The hub includes:
-- 📚 **4 learning paths** (beginner to expert)
-- 🎓 **9 comprehensive guides** covering all topics
-- 🗺️ **Quick task lookup** for common operations
-- 🆘 **Troubleshooting** for each area
-
-### 🤝 Contributing & Community
-
-- **[Contributing Guide](CONTRIBUTING.md)** - How to contribute
-- **[Changelog](CHANGELOG.md)** - Version history and changes
-- **[License](LICENSE)** - MIT License
-
-### 🔗 External Resources
-
-- [FastAPI Documentation](https://fastapi.tiangolo.com/)
-- [Dokploy Documentation](https://dokploy.com/docs)
-- [go-whatsapp-web-multidevice](https://github.com/aldinokemal/go-whatsapp-web-multidevice)
-
-## 💬 Support
-
-For issues and questions:
-- Open an issue on GitHub
-- Check existing issues for solutions
-
----
-
-**Made with ❤️ for the WhatsApp automation community**
+MIT — see `LICENSE` if one is present, otherwise add one before publishing.

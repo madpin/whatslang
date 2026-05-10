@@ -1,32 +1,43 @@
-version: '3.8'
-
 services:
   whatslang:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: whatslang-bot-service
+    container_name: whatslang
     restart: unless-stopped
     ports:
       - "${PORT:-8000}:8000"
     environment:
-      - HOST=${HOST:-0.0.0.0}
-      - PORT=${PORT:-8000}
+      - HOST=0.0.0.0
+      - PORT=8000
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - ENVIRONMENT=${ENVIRONMENT:-production}
+
+      # Single-user dashboard auth (leave both empty to disable auth).
+      - DASHBOARD_USER=${DASHBOARD_USER:-}
+      - DASHBOARD_PASSWORD=${DASHBOARD_PASSWORD:-}
+      - SESSION_SECRET=${SESSION_SECRET:-}
+
+      # WhatsApp API (whatsapp-mcp / wha-mcp compatible)
       - WHATSAPP_BASE_URL=${WHATSAPP_BASE_URL}
-      - WHATSAPP_API_USER=${WHATSAPP_API_USER}
-      - WHATSAPP_API_PASSWORD=${WHATSAPP_API_PASSWORD}
-      - CHAT_JID=${CHAT_JID}
+      - WHATSAPP_API_USER=${WHATSAPP_API_USER:-}
+      - WHATSAPP_API_PASSWORD=${WHATSAPP_API_PASSWORD:-}
       - DEVICE_ID=${DEVICE_ID:-}
+
+      # LLM (OpenAI / LiteLLM compatible)
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.openai.com/v1}
-      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
+      - OPENAI_VISION_MODEL=${OPENAI_VISION_MODEL:-}
+      - OPENAI_AUDIO_MODEL=${OPENAI_AUDIO_MODEL:-whisper-1}
+
+      # Bot runtime
       - POLL_INTERVAL=${POLL_INTERVAL:-5}
-      - DB_PATH=${DB_PATH:-/data/messages.db}
+      - DB_PATH=/data/messages.db
+
+      # Optional: legacy single-chat seed
+      - CHAT_JID=${CHAT_JID:-}
     volumes:
-      # Persistent data volume - contains database and any other files that need to survive deployments
-      # In Dokploy, mount this to a host directory for persistence between deployments
       - whatslang-data:/data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -45,10 +56,6 @@ services:
 volumes:
   whatslang-data:
     driver: local
-    # For production/Dokploy: Replace this with a bind mount to a host directory
-    # Example: 
-    #   volumes:
-    #     - /path/on/host/whatslang-data:/data
 
 networks:
   whatslang-network:

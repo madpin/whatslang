@@ -73,3 +73,7 @@ htmlcov/
 *.tmp
 *.orig
 .pre-commit-config.yaml
+
+# Web (frontend)
+web/node_modules/
+web/dist/

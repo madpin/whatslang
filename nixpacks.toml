@@ -1,28 +1,46 @@
-# Nixpacks configuration for Dokploy deployment
+# Nixpacks build plan for Dokploy / Coolify / Railway-Nixpacks deployments.
+#
+# Builds the Vite SPA, installs Python deps into a venv, then starts uvicorn.
+# Single artifact: FastAPI serves the SPA from /app/web/dist.
+
 [phases.setup]
+# Pin nixpkgs for reproducibility. Bump when upstream packages change.
 nixpkgsArchive = "51ad838b03a05b1de6f9f2a0fffecee64a9788ee"
 nixPkgs = [
   "python311",
   "python311Packages.pip",
   "python311Packages.virtualenv",
-  "curl",
-  "ffmpeg-full",
   "nodejs_22",
+  "ffmpeg-full",
+  "curl",
+  "cacert",
 ]
 
 [phases.install]
+# Python deps go into an isolated venv so they survive across phases.
 cmds = [
-  "python -m venv /opt/venv",
+  "python -m venv --copies /opt/venv",
   ". /opt/venv/bin/activate && pip install --upgrade pip",
-  ". /opt/venv/bin/activate && pip install -r requirements.txt",
+  ". /opt/venv/bin/activate && pip install --no-cache-dir -r requirements.txt",
 ]
+cacheDirectories = ["/root/.cache/pip"]
 
 [phases.build]
-cmds = ["cd frontend-v2 && npm install && npm run build"]
+# Install + build the SPA. `npm ci` is reproducible from package-lock.json.
+dependsOn = ["install"]
+cmds = [
+  "cd web && npm ci --no-audit --no-fund",
+  "cd web && npm run build",
+  "test -f web/dist/index.html",
+]
+cacheDirectories = ["web/node_modules", "/root/.npm"]
 
 [start]
-cmd = ". /opt/venv/bin/activate && uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips '*'"
+cmd = ". /opt/venv/bin/activate && python -m uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips '*'"
 
 [variables]
 PYTHONUNBUFFERED = "1"
 PYTHONDONTWRITEBYTECODE = "1"
+PIP_DISABLE_PIP_VERSION_CHECK = "1"
+# Default to a writable persistent path; override with a volume mount.
+DB_PATH = "/data/messages.db"
