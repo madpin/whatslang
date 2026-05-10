@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 1100" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">
+  <defs>
+    <linearGradient id="wabg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#efeae2"/>
+      <stop offset="100%" stop-color="#ddd5c8"/>
+    </linearGradient>
+    <pattern id="dots" patternUnits="userSpaceOnUse" width="20" height="20">
+      <circle cx="2" cy="2" r="1" fill="#cdc6b6" opacity="0.35"/>
+    </pattern>
+  </defs>
+
+  <rect width="880" height="1100" fill="url(#wabg)"/>
+  <rect width="880" height="1100" fill="url(#dots)"/>
+
+  <!-- Header bar -->
+  <g>
+    <rect width="880" height="64" fill="#005c4b"/>
+    <circle cx="42" cy="32" r="20" fill="#dcfce7"/>
+    <text x="42" y="38" text-anchor="middle" font-size="16" font-weight="700" fill="#166534">F</text>
+    <text x="76" y="28" font-size="14" font-weight="700" fill="white">Friends</text>
+    <text x="76" y="48" font-size="11" fill="#bbf7d0">online &#183; bots: ai, joke, health</text>
+  </g>
+
+  <!-- Bubbles -->
+  <g>
+    
+        <g transform="translate(440,80)">
+          <rect width="360" height="42" rx="12" fill="#d9fdd3" stroke="#e4e4e7"/>
+          
+          <text x="14" y="24" font-size="13" fill="#0b141a">Hello! How are you?</text>
+          <text x="348" y="34" text-anchor="end" font-size="10" fill="#667781">10:41</text>
+        </g>
+        <g transform="translate(60,134)">
+          <rect width="360" height="58" rx="12" fill="#ffffff" stroke="#e4e4e7"/>
+          <text x="14" y="20" font-size="10" font-weight="700" fill="#16a34a" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">[ai]</text>
+          <text x="14" y="40" font-size="13" fill="#0b141a">Olá! Como você está?</text>
+          <text x="348" y="50" text-anchor="end" font-size="10" fill="#667781">10:41</text>
+        </g>
+        <g transform="translate(440,204)">
+          <rect width="360" height="42" rx="12" fill="#d9fdd3" stroke="#e4e4e7"/>
+          
+          <text x="14" y="24" font-size="13" fill="#0b141a">Can you tell me a joke?</text>
+          <text x="348" y="34" text-anchor="end" font-size="10" fill="#667781">10:42</text>
+        </g>
+        <g transform="translate(60,258)">
+          <rect width="360" height="74" rx="12" fill="#ffffff" stroke="#e4e4e7"/>
+          <text x="14" y="20" font-size="10" font-weight="700" fill="#16a34a" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">[joke]</text>
+          <text x="14" y="40" font-size="13" fill="#0b141a">Why did the developer go broke?</text>
+        <text x="14" y="56" font-size="13" fill="#0b141a">Because he used up all his cache.</text>
+          <text x="348" y="66" text-anchor="end" font-size="10" fill="#667781">10:42</text>
+        </g>
+        <g transform="translate(440,344)">
+          <rect width="360" height="42" rx="12" fill="#d9fdd3" stroke="#e4e4e7"/>
+          
+          <text x="14" y="24" font-size="13" fill="#0b141a">[image of food]</text>
+          <text x="348" y="34" text-anchor="end" font-size="10" fill="#667781">12:30</text>
+        </g>
+        <g transform="translate(60,398)">
+          <rect width="360" height="106" rx="12" fill="#ffffff" stroke="#e4e4e7"/>
+          <text x="14" y="20" font-size="10" font-weight="700" fill="#16a34a" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">[health]</text>
+          <text x="14" y="40" font-size="13" fill="#0b141a">Looks like a bowl of poke (about 520</text>
+        <text x="14" y="56" font-size="13" fill="#0b141a">kcal).</text>
+        <text x="14" y="72" font-size="13" fill="#0b141a">Protein 30g, carbs 60g, fat 18g.</text>
+        <text x="14" y="88" font-size="13" fill="#0b141a">Nice balance! Add a glass of water.</text>
+          <text x="348" y="98" text-anchor="end" font-size="10" fill="#667781">12:31</text>
+        </g>
+        <g transform="translate(440,516)">
+          <rect width="360" height="42" rx="12" fill="#d9fdd3" stroke="#e4e4e7"/>
+          
+          <text x="14" y="24" font-size="13" fill="#0b141a">[voice note]</text>
+          <text x="348" y="34" text-anchor="end" font-size="10" fill="#667781">12:33</text>
+        </g>
+        <g transform="translate(60,570)">
+          <rect width="360" height="122" rx="12" fill="#ffffff" stroke="#e4e4e7"/>
+          <text x="14" y="20" font-size="10" font-weight="700" fill="#16a34a" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">[ai]</text>
+          <text x="14" y="40" font-size="13" fill="#0b141a">Transcription:</text>
+        <text x="14" y="56" font-size="13" fill="#0b141a">"Bom dia, tudo bem?"</text>
+        <text x="14" y="72" font-size="13" fill="#0b141a"></text>
+        <text x="14" y="88" font-size="13" fill="#0b141a">Translation:</text>
+        <text x="14" y="104" font-size="13" fill="#0b141a">Good morning, how are you?</text>
+          <text x="348" y="114" text-anchor="end" font-size="10" fill="#667781">12:34</text>
+        </g>
+  </g>
+
+  <!-- Composer -->
+  <g transform="translate(0,1040)">
+    <rect width="880" height="60" fill="#f0f2f5"/>
+    <rect x="60" y="14" width="700" height="32" rx="16" fill="white"/>
+    <text x="80" y="34" font-size="13" fill="#667781">Type a message…</text>
+    <circle cx="800" cy="30" r="20" fill="#005c4b"/>
+    <text x="800" y="36" text-anchor="middle" font-size="14" fill="white">→</text>
+  </g>
+</svg>

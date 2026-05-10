@@ -1,0 +1,260 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 900" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">
+  
+  <defs>
+    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#22c55e"/>
+      <stop offset="100%" stop-color="#16a34a"/>
+    </linearGradient>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fafafa"/>
+      <stop offset="100%" stop-color="#f4f4f5"/>
+    </linearGradient>
+    <linearGradient id="bgDark" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0a0a0a"/>
+      <stop offset="100%" stop-color="#111114"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#fafafa"/>
+    </linearGradient>
+    <linearGradient id="cardDark" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1a1a1f"/>
+      <stop offset="100%" stop-color="#15151a"/>
+    </linearGradient>
+    <filter id="cardShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="10" flood-color="#0f172a" flood-opacity="0.10"/>
+    </filter>
+    <filter id="cardShadowDark" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="6" stdDeviation="12" flood-color="#000000" flood-opacity="0.45"/>
+    </filter>
+    <filter id="modalShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="20" stdDeviation="30" flood-color="#0f172a" flood-opacity="0.30"/>
+    </filter>
+  </defs>
+
+  
+  <rect width="1440" height="900" fill="url(#bg)"/>
+
+  <!-- Sidebar -->
+  <g>
+    <rect width="228" height="900" fill="#0a0a0a"/>
+    <g transform="translate(28,40)">
+      <rect width="32" height="32" rx="9" fill="url(#brand)"/>
+      <text x="16" y="22" text-anchor="middle" font-size="14" font-weight="700" fill="white">W</text>
+      <text x="44" y="22" font-size="15" font-weight="700" fill="white">Whatslang</text>
+    </g>
+    <text x="34" y="92" font-size="10" fill="#52525b" letter-spacing="1.4">NAVIGATION</text>
+    <g>
+      <rect x="14" y="110" width="200" height="36" rx="9" fill="#16a34a"/><text x="34" y="132" font-size="13" font-weight="600" fill="white">Dashboard</text>
+      <text x="34" y="176" font-size="13" fill="#a1a1aa">Chats</text>
+      <text x="34" y="220" font-size="13" fill="#a1a1aa">Bots</text>
+      <text x="34" y="264" font-size="13" fill="#a1a1aa">Diagnostics</text>
+      <text x="34" y="308" font-size="13" fill="#a1a1aa">Settings</text>
+    </g>
+    <g transform="translate(28,828)">
+      <rect width="172" height="40" rx="10" fill="#15151a"/>
+      <circle cx="24" cy="20" r="11" fill="#27272a"/>
+      <text x="24" y="24" text-anchor="middle" font-size="11" font-weight="700" fill="#a1a1aa">A</text>
+      <text x="44" y="17" font-size="11" font-weight="600" fill="#e4e4e7">admin</text>
+      <text x="44" y="30" font-size="9" fill="#71717a">signed in</text>
+    </g>
+  </g>
+
+  <!-- Top bar -->
+  <g>
+    <rect x="228" width="1212" height="64" fill="white"/>
+    <line x1="228" y1="64" x2="1440" y2="64" stroke="#e4e4e7"/>
+    <g transform="translate(252,22)">
+      <text font-size="16" font-weight="700" fill="#18181b">Friends</text>
+      <text y="20" font-size="11" fill="#71717a">12345...whatsapp.net &#183; DM &#183; 421 messages &#183; last 2 minutes ago</text>
+    </g>
+    <g transform="translate(1140,20)">
+      <rect width="120" height="28" rx="8" fill="#f4f4f5"/>
+      <text x="14" y="18" font-size="11" fill="#71717a">Sync from WhatsApp</text>
+    </g>
+    <g transform="translate(1280,20)">
+      <rect width="100" height="28" rx="8" fill="url(#brand)"/>
+      <text x="50" y="18" text-anchor="middle" font-size="11" font-weight="600" fill="white">+ Add chat</text>
+    </g>
+  </g>
+
+
+  <!-- Chat info -->
+  <g transform="translate(252,96)" filter="url(#cardShadow)">
+    <rect width="1140" height="100" rx="14" fill="white" stroke="#e4e4e7"/>
+    <g transform="translate(28,26)">
+      <circle cx="22" cy="22" r="22" fill="#dcfce7"/>
+      <text x="22" y="29" text-anchor="middle" font-size="20" font-weight="700" fill="#166534">F</text>
+      <text x="60" y="20" font-size="16" font-weight="700" fill="#18181b">Friends</text>
+      <text x="60" y="40" font-size="11" fill="#71717a" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">12345.whatsapp.net</text>
+
+      <g transform="translate(60,52)" font-size="10">
+        <rect width="40" height="20" rx="10" fill="#fef3c7"/>
+        <text x="20" y="14" text-anchor="middle" font-weight="600" fill="#92400e">DM</text>
+        <text x="60" y="14" fill="#71717a">421 messages &#183; last activity 2 minutes ago</text>
+      </g>
+    </g>
+    <g transform="translate(900,32)">
+      <rect width="100" height="32" rx="8" fill="#f4f4f5"/>
+      <text x="50" y="20" text-anchor="middle" font-size="11" font-weight="600" fill="#52525b">✉ Messages</text>
+      <rect x="112" width="120" height="32" rx="8" fill="#fee2e2"/>
+      <text x="172" y="20" text-anchor="middle" font-size="11" font-weight="700" fill="#b91c1c">Delete chat</text>
+    </g>
+  </g>
+
+  <!-- Bot assignments -->
+  <g transform="translate(252,212)">
+    <text font-size="13" font-weight="700" fill="#18181b">Bot assignments</text>
+    <text y="18" font-size="11" fill="#71717a">Toggle bots for this chat. Settings persist after stopping.</text>
+
+    <g transform="translate(0,42)">
+      
+        <g transform="translate(0,0)" filter="url(#cardShadow)">
+          <rect width="724" height="98" rx="14" fill="white" stroke="#e4e4e7"/>
+          <g transform="translate(20,16)">
+            <text font-size="22">🌐</text>
+            <text x="44" y="6" font-size="14" font-weight="700" fill="#18181b">EN ↔ PT Translator</text>
+            <text x="44" y="24" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#16a34a">[ai]</text>
+          </g>
+          <g transform="translate(20,62)">
+            <circle cx="6" cy="6" r="6" fill="#22c55e"/>
+            <text x="20" y="10" font-size="11" font-weight="600" fill="#27272a">running 4h 12m</text>
+            <text x="20" y="26" font-size="10" fill="#71717a">ctx 0  &#183;  redirect off</text>
+          </g>
+          <g transform="translate(540,30)">
+            <rect width="56" height="28" rx="8" fill="#f4f4f5"/>
+            <text x="28" y="18" text-anchor="middle" font-size="11" font-weight="600" fill="#52525b">⚙ Settings</text>
+            <rect x="64" width="44" height="28" rx="8" fill="#f4f4f5"/>
+            <text x="86" y="18" text-anchor="middle" font-size="11" font-weight="600" fill="#52525b">📜 Logs</text>
+            <rect x="116" width="56" height="28" rx="8" fill="#fee2e2"/>
+            <text x="144" y="18" text-anchor="middle" font-size="11" font-weight="700" fill="#b91c1c">Stop</text>
+          </g>
+        </g>
+        <g transform="translate(0,110)" filter="url(#cardShadow)">
+          <rect width="724" height="98" rx="14" fill="white" stroke="#e4e4e7"/>
+          <g transform="translate(20,16)">
+            <text font-size="22">🇧🇷🇬🇷</text>
+            <text x="44" y="6" font-size="14" font-weight="700" fill="#18181b">Trilingual EN+PT+EL</text>
+            <text x="44" y="24" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#16a34a">[tri]</text>
+          </g>
+          <g transform="translate(20,62)">
+            <circle cx="6" cy="6" r="6" fill="#22c55e"/>
+            <text x="20" y="10" font-size="11" font-weight="600" fill="#27272a">running 1h 38m</text>
+            <text x="20" y="26" font-size="10" fill="#71717a">ctx 5  &#183;  redirect off</text>
+          </g>
+          <g transform="translate(540,30)">
+            <rect width="56" height="28" rx="8" fill="#f4f4f5"/>
+            <text x="28" y="18" text-anchor="middle" font-size="11" font-weight="600" fill="#52525b">⚙ Settings</text>
+            <rect x="64" width="44" height="28" rx="8" fill="#f4f4f5"/>
+            <text x="86" y="18" text-anchor="middle" font-size="11" font-weight="600" fill="#52525b">📜 Logs</text>
+            <rect x="116" width="56" height="28" rx="8" fill="#fee2e2"/>
+            <text x="144" y="18" text-anchor="middle" font-size="11" font-weight="700" fill="#b91c1c">Stop</text>
+          </g>
+        </g>
+        <g transform="translate(0,220)" filter="url(#cardShadow)">
+          <rect width="724" height="98" rx="14" fill="white" stroke="#e4e4e7"/>
+          <g transform="translate(20,16)">
+            <text font-size="22">😂</text>
+            <text x="44" y="6" font-size="14" font-weight="700" fill="#18181b">Joke Bot</text>
+            <text x="44" y="24" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#16a34a">[joke]</text>
+          </g>
+          <g transform="translate(20,62)">
+            <circle cx="6" cy="6" r="6" fill="#a1a1aa"/>
+            <text x="20" y="10" font-size="11" font-weight="600" fill="#27272a">stopped</text>
+            <text x="20" y="26" font-size="10" fill="#71717a">ctx 0  &#183;  redirect off</text>
+          </g>
+          <g transform="translate(540,30)">
+            <rect width="56" height="28" rx="8" fill="#f4f4f5"/>
+            <text x="28" y="18" text-anchor="middle" font-size="11" font-weight="600" fill="#52525b">⚙ Settings</text>
+            <rect x="64" width="44" height="28" rx="8" fill="#f4f4f5"/>
+            <text x="86" y="18" text-anchor="middle" font-size="11" font-weight="600" fill="#52525b">📜 Logs</text>
+            <rect x="116" width="56" height="28" rx="8" fill="#dcfce7"/>
+            <text x="144" y="18" text-anchor="middle" font-size="11" font-weight="700" fill="#166534">Start</text>
+          </g>
+        </g>
+        <g transform="translate(0,330)" filter="url(#cardShadow)">
+          <rect width="724" height="98" rx="14" fill="white" stroke="#e4e4e7"/>
+          <g transform="translate(20,16)">
+            <text font-size="22">🥗</text>
+            <text x="44" y="6" font-size="14" font-weight="700" fill="#18181b">Health Coach</text>
+            <text x="44" y="24" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#16a34a">[health]</text>
+          </g>
+          <g transform="translate(20,62)">
+            <circle cx="6" cy="6" r="6" fill="#a1a1aa"/>
+            <text x="20" y="10" font-size="11" font-weight="600" fill="#27272a">stopped</text>
+            <text x="20" y="26" font-size="10" fill="#71717a">ctx 5  &#183;  redirect to DM Sam</text>
+          </g>
+          <g transform="translate(540,30)">
+            <rect width="56" height="28" rx="8" fill="#f4f4f5"/>
+            <text x="28" y="18" text-anchor="middle" font-size="11" font-weight="600" fill="#52525b">⚙ Settings</text>
+            <rect x="64" width="44" height="28" rx="8" fill="#f4f4f5"/>
+            <text x="86" y="18" text-anchor="middle" font-size="11" font-weight="600" fill="#52525b">📜 Logs</text>
+            <rect x="116" width="56" height="28" rx="8" fill="#dcfce7"/>
+            <text x="144" y="18" text-anchor="middle" font-size="11" font-weight="700" fill="#166534">Start</text>
+          </g>
+        </g>
+    </g>
+  </g>
+
+  <!-- Add a bot side panel -->
+  <g transform="translate(996,212)" filter="url(#cardShadow)">
+    <rect width="396" height="500" rx="14" fill="white" stroke="#e4e4e7"/>
+    <g transform="translate(20,24)">
+      <text font-size="13" font-weight="700" fill="#18181b">Add a bot</text>
+      <text y="18" font-size="11" fill="#71717a">Pick from the catalog below to assign.</text>
+    </g>
+
+    <g transform="translate(20,68)">
+      <rect width="356" height="36" rx="8" fill="#f4f4f5"/>
+      <text x="14" y="22" font-size="11" fill="#a1a1aa">Search bots…</text>
+    </g>
+
+    <g transform="translate(20,124)">
+      <rect width="356" height="68" rx="10" fill="#f9fafb" stroke="#e4e4e7"/>
+      <text x="14" y="22" font-size="18">🌐</text>
+      <text x="44" y="22" font-size="12" font-weight="700" fill="#18181b">EN ↔ PT Translator</text>
+      <text x="14" y="42" font-size="10" fill="#71717a">[ai] &#183; text + image + audio + video</text>
+      <text x="14" y="58" font-size="10" fill="#71717a">Translates English ↔ Portuguese.</text>
+      <g transform="translate(310,38)">
+        <rect width="36" height="24" rx="6" fill="url(#brand)"/>
+        <text x="18" y="16" text-anchor="middle" font-size="11" font-weight="700" fill="white">→</text>
+      </g>
+    </g>
+
+    <g transform="translate(20,208)">
+      <rect width="356" height="68" rx="10" fill="#f9fafb" stroke="#e4e4e7"/>
+      <text x="14" y="22" font-size="18">😂</text>
+      <text x="44" y="22" font-size="12" font-weight="700" fill="#18181b">Joke Bot</text>
+      <text x="14" y="42" font-size="10" fill="#71717a">[joke] &#183; text only</text>
+      <text x="14" y="58" font-size="10" fill="#71717a">Family-friendly joke per message.</text>
+      <g transform="translate(310,38)">
+        <rect width="36" height="24" rx="6" fill="url(#brand)"/>
+        <text x="18" y="16" text-anchor="middle" font-size="11" font-weight="700" fill="white">→</text>
+      </g>
+    </g>
+
+    <g transform="translate(20,292)">
+      <rect width="356" height="68" rx="10" fill="#f9fafb" stroke="#e4e4e7"/>
+      <text x="14" y="22" font-size="18">🥗</text>
+      <text x="44" y="22" font-size="12" font-weight="700" fill="#18181b">Health Coach</text>
+      <text x="14" y="42" font-size="10" fill="#71717a">[health] &#183; text + image + audio + video</text>
+      <text x="14" y="58" font-size="10" fill="#71717a">Empathic but honest. Estimates kcal.</text>
+      <g transform="translate(310,38)">
+        <rect width="36" height="24" rx="6" fill="url(#brand)"/>
+        <text x="18" y="16" text-anchor="middle" font-size="11" font-weight="700" fill="white">→</text>
+      </g>
+    </g>
+
+    <g transform="translate(20,376)">
+      <rect width="356" height="68" rx="10" fill="#f9fafb" stroke="#e4e4e7"/>
+      <text x="14" y="22" font-size="18">🇧🇷🇬🇷</text>
+      <text x="60" y="22" font-size="12" font-weight="700" fill="#18181b">Trilingual EN/PT/EL</text>
+      <text x="14" y="42" font-size="10" fill="#71717a">[tri] &#183; text + image + audio + video</text>
+      <text x="14" y="58" font-size="10" fill="#71717a">EN → PT+EL, anything else → EN.</text>
+      <g transform="translate(310,38)">
+        <rect width="36" height="24" rx="6" fill="url(#brand)"/>
+        <text x="18" y="16" text-anchor="middle" font-size="11" font-weight="700" fill="white">→</text>
+      </g>
+    </g>
+  </g>
+</svg>

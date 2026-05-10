@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 480" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">
+  <defs>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#fafafa"/>
+    </linearGradient>
+    <filter id="cardShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="10" flood-color="#0f172a" flood-opacity="0.10"/>
+    </filter>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#16a34a"/>
+    </marker>
+  </defs>
+
+  <rect width="1280" height="480" fill="#f8fafc"/>
+
+  <text x="640" y="48" text-anchor="middle" font-size="22" font-weight="700" fill="#0f172a">Per-message bot lifecycle</text>
+  <text x="640" y="72" text-anchor="middle" font-size="13" fill="#475569">Each message goes through a fixed pipeline. The runner is the same for every bot — only the BotSpec changes.</text>
+
+  
+    <g transform="translate(40,140)" filter="url(#cardShadow)">
+      <rect width="200" height="220" rx="14" fill="url(#card)" stroke="#e2e8f0"/>
+      <circle cx="32" cy="36" r="16" fill="#16a34a"/>
+      <text x="32" y="41" text-anchor="middle" font-size="13" font-weight="700" fill="white">1</text>
+      <text x="60" y="42" font-size="13" font-weight="700" fill="#0f172a">Poll gateway</text>
+      <g transform="translate(20,72)">
+        <text y="0" font-size="11" fill="#475569">Every poll_interval_seconds</text>
+        <text y="18" font-size="11" fill="#475569">the runner asks the gateway</text>
+        <text y="36" font-size="11" fill="#475569">for new messages on its</text>
+        <text y="54" font-size="11" fill="#475569">assigned chat.</text>
+        <text y="72" font-size="11" fill="#475569"></text>
+        <text y="90" font-size="11" fill="#475569">Skips if the manager has</text>
+        <text y="108" font-size="11" fill="#475569">paused this bot.</text>
+      </g>
+    </g>
+    <g transform="translate(264,140)" filter="url(#cardShadow)">
+      <rect width="200" height="220" rx="14" fill="url(#card)" stroke="#e2e8f0"/>
+      <circle cx="32" cy="36" r="16" fill="#16a34a"/>
+      <text x="32" y="41" text-anchor="middle" font-size="13" font-weight="700" fill="white">2</text>
+      <text x="60" y="42" font-size="13" font-weight="700" fill="#0f172a">Filter &amp; gate</text>
+      <g transform="translate(20,72)">
+        <text y="0" font-size="11" fill="#475569">Drop self-messages unless</text>
+        <text y="18" font-size="11" fill="#475569">self-answer is on. Drop</text>
+        <text y="36" font-size="11" fill="#475569">already-processed IDs</text>
+        <text y="54" font-size="11" fill="#475569">(per bot, per chat).</text>
+        <text y="72" font-size="11" fill="#475569"></text>
+        <text y="90" font-size="11" fill="#475569">Honors prefix matching</text>
+        <text y="108" font-size="11" fill="#475569">when bot.prefix is set.</text>
+      </g>
+    </g>
+    <g transform="translate(488,140)" filter="url(#cardShadow)">
+      <rect width="200" height="220" rx="14" fill="url(#card)" stroke="#e2e8f0"/>
+      <circle cx="32" cy="36" r="16" fill="#16a34a"/>
+      <text x="32" y="41" text-anchor="middle" font-size="13" font-weight="700" fill="white">3</text>
+      <text x="60" y="42" font-size="13" font-weight="700" fill="#0f172a">Resolve media</text>
+      <g transform="translate(20,72)">
+        <text y="0" font-size="11" fill="#475569">Download attachment via</text>
+        <text y="18" font-size="11" fill="#475569">the gateway. For audio:</text>
+        <text y="36" font-size="11" fill="#475569">Whisper. For video: extract</text>
+        <text y="54" font-size="11" fill="#475569">audio with ffmpeg, then</text>
+        <text y="72" font-size="11" fill="#475569">transcribe.</text>
+        <text y="90" font-size="11" fill="#475569">Images go straight to the</text>
+        <text y="108" font-size="11" fill="#475569">vision-capable LLM call.</text>
+      </g>
+    </g>
+    <g transform="translate(712,140)" filter="url(#cardShadow)">
+      <rect width="200" height="220" rx="14" fill="url(#card)" stroke="#e2e8f0"/>
+      <circle cx="32" cy="36" r="16" fill="#16a34a"/>
+      <text x="32" y="41" text-anchor="middle" font-size="13" font-weight="700" fill="white">4</text>
+      <text x="60" y="42" font-size="13" font-weight="700" fill="#0f172a">Call LLM</text>
+      <g transform="translate(20,72)">
+        <text y="0" font-size="11" fill="#475569">Build messages from BotSpec:</text>
+        <text y="18" font-size="11" fill="#475569">system prompt + last N turns</text>
+        <text y="36" font-size="11" fill="#475569">+ this user message + media.</text>
+        <text y="54" font-size="11" fill="#475569">Call OpenAI/LiteLLM client.</text>
+        <text y="72" font-size="11" fill="#475569"></text>
+        <text y="90" font-size="11" fill="#475569">N = context_size from the</text>
+        <text y="108" font-size="11" fill="#475569">per-chat assignment.</text>
+      </g>
+    </g>
+    <g transform="translate(936,140)" filter="url(#cardShadow)">
+      <rect width="200" height="220" rx="14" fill="url(#card)" stroke="#e2e8f0"/>
+      <circle cx="32" cy="36" r="16" fill="#16a34a"/>
+      <text x="32" y="41" text-anchor="middle" font-size="13" font-weight="700" fill="white">5</text>
+      <text x="60" y="42" font-size="13" font-weight="700" fill="#0f172a">Send reply</text>
+      <g transform="translate(20,72)">
+        <text y="0" font-size="11" fill="#475569">Optional bot prefix is added</text>
+        <text y="18" font-size="11" fill="#475569">(e.g. "[ai] ...").</text>
+        <text y="36" font-size="11" fill="#475569">Long replies are split into</text>
+        <text y="54" font-size="11" fill="#475569">~3500-char chunks.</text>
+        <text y="72" font-size="11" fill="#475569"></text>
+        <text y="90" font-size="11" fill="#475569">Can redirect to another</text>
+        <text y="108" font-size="11" fill="#475569">chat (forward_to_chat_id).</text>
+      </g>
+    </g>
+
+  <g stroke="#16a34a" stroke-width="2">
+    <line x1="240" y1="250" x2="262" y2="250" marker-end="url(#arrow)"/><line x1="464" y1="250" x2="486" y2="250" marker-end="url(#arrow)"/><line x1="688" y1="250" x2="710" y2="250" marker-end="url(#arrow)"/><line x1="912" y1="250" x2="934" y2="250" marker-end="url(#arrow)"/>
+  </g>
+
+  <text x="640" y="412" text-anchor="middle" font-size="11" fill="#64748b">All steps are observable in /api/diagnostics and the per-bot log modal.</text>
+</svg>

@@ -1,0 +1,162 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">
+  <defs>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#fafafa"/>
+    </linearGradient>
+    <filter id="cardShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="10" flood-color="#0f172a" flood-opacity="0.10"/>
+    </filter>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#16a34a"/>
+    </marker>
+    <marker id="arrowDim" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#94a3b8"/>
+    </marker>
+  </defs>
+
+  <rect width="1280" height="720" fill="#f8fafc"/>
+
+  <text x="640" y="48" text-anchor="middle" font-size="22" font-weight="700" fill="#0f172a">Whatslang architecture</text>
+  <text x="640" y="72" text-anchor="middle" font-size="13" fill="#475569">A single FastAPI process serves the SPA, talks to a WhatsApp gateway, and runs a thread per (bot, chat).</text>
+
+  <!-- WA users -->
+  <g transform="translate(40,140)" filter="url(#cardShadow)">
+    <rect width="200" height="100" rx="14" fill="url(#card)" stroke="#e2e8f0"/>
+    <text x="100" y="34" text-anchor="middle" font-size="13" font-weight="600" fill="#0f172a">📱 WhatsApp users</text>
+    <text x="100" y="56" text-anchor="middle" font-size="11" fill="#64748b">Friends &#183; groups &#183; DMs</text>
+    <text x="100" y="74" text-anchor="middle" font-size="11" fill="#64748b">Text &#183; image &#183; audio &#183; video</text>
+  </g>
+
+  <!-- WA gateway -->
+  <g transform="translate(40,340)" filter="url(#cardShadow)">
+    <rect width="200" height="120" rx="14" fill="url(#card)" stroke="#e2e8f0"/>
+    <rect x="20" y="16" width="36" height="36" rx="8" fill="#dcfce7"/>
+    <text x="38" y="40" text-anchor="middle" font-size="16">📡</text>
+    <text x="64" y="34" font-size="13" font-weight="600" fill="#0f172a">WhatsApp gateway</text>
+    <text x="64" y="50" font-size="10" fill="#64748b">whatsapp-mcp / wha-mcp</text>
+    <text x="20" y="78" font-size="11" fill="#475569">REST: list chats, list</text>
+    <text x="20" y="94" font-size="11" fill="#475569">messages, send, download</text>
+    <text x="20" y="110" font-size="11" fill="#475569">media, presence.</text>
+  </g>
+
+  <!-- Backend center -->
+  <g transform="translate(330,140)" filter="url(#cardShadow)">
+    <rect width="620" height="440" rx="18" fill="white" stroke="#e2e8f0"/>
+    <rect width="620" height="44" rx="18" fill="#052e16"/>
+    <rect y="22" width="620" height="22" fill="#052e16"/>
+    <text x="20" y="29" font-size="14" font-weight="700" fill="#86efac">Whatslang backend &#183; FastAPI</text>
+    <text x="600" y="29" text-anchor="end" font-size="10" fill="#bbf7d0">app/ &#183; Python 3.10+</text>
+
+    <g transform="translate(20,68)">
+      <g>
+        <rect width="280" height="84" rx="10" fill="#f0fdf4" stroke="#bbf7d0"/>
+        <text x="14" y="22" font-size="12" font-weight="700" fill="#166534">HTTP layer &#183; routers/</text>
+        <g font-size="11" fill="#15803d">
+          <text x="14" y="40">/api/auth &#183; /api/chats &#183; /api/bots</text>
+          <text x="14" y="56">/api/system &#183; /api/diagnostics</text>
+          <text x="14" y="72">SPA mount &#183; /health &#183; /ready</text>
+        </g>
+      </g>
+
+      <g transform="translate(300,0)">
+        <rect width="280" height="84" rx="10" fill="#eff6ff" stroke="#bfdbfe"/>
+        <text x="14" y="22" font-size="12" font-weight="700" fill="#1d4ed8">Bot manager &#183; services/</text>
+        <g font-size="11" fill="#1e40af">
+          <text x="14" y="40">Per (bot, chat) thread</text>
+          <text x="14" y="56">Ring-buffer logs &#183; live status</text>
+          <text x="14" y="72">Resume from DB on boot</text>
+        </g>
+      </g>
+
+      <g transform="translate(0,100)">
+        <rect width="280" height="84" rx="10" fill="#f5f3ff" stroke="#ddd6fe"/>
+        <text x="14" y="22" font-size="12" font-weight="700" fill="#6d28d9">Bot runner &#183; bots/base.py</text>
+        <g font-size="11" fill="#5b21b6">
+          <text x="14" y="40">Polls gateway &#183; dedup &#183; gates</text>
+          <text x="14" y="56">Splits long replies &#183; logs</text>
+          <text x="14" y="72">Per-chat settings (context, ...)</text>
+        </g>
+      </g>
+
+      <g transform="translate(300,100)">
+        <rect width="280" height="84" rx="10" fill="#fffbeb" stroke="#fde68a"/>
+        <text x="14" y="22" font-size="12" font-weight="700" fill="#92400e">LLM service &#183; services/llm.py</text>
+        <g font-size="11" fill="#78350f">
+          <text x="14" y="40">OpenAI / LiteLLM client</text>
+          <text x="14" y="56">Text &#183; vision &#183; Whisper</text>
+          <text x="14" y="72">ffmpeg: video → audio</text>
+        </g>
+      </g>
+
+      <g transform="translate(0,200)">
+        <rect width="280" height="84" rx="10" fill="#fdf4ff" stroke="#f5d0fe"/>
+        <text x="14" y="22" font-size="12" font-weight="700" fill="#a21caf">SQLite repository &#183; db.py</text>
+        <g font-size="11" fill="#86198f">
+          <text x="14" y="40">chats &#183; bot_chat_assignments</text>
+          <text x="14" y="56">processed_messages (dedup)</text>
+          <text x="14" y="72">Single-file, on a volume</text>
+        </g>
+      </g>
+
+      <g transform="translate(300,200)">
+        <rect width="280" height="84" rx="10" fill="#fef2f2" stroke="#fecaca"/>
+        <text x="14" y="22" font-size="12" font-weight="700" fill="#b91c1c">Auth &#183; auth.py</text>
+        <g font-size="11" fill="#991b1b">
+          <text x="14" y="40">Single user from env</text>
+          <text x="14" y="56">HMAC-signed cookies</text>
+          <text x="14" y="72">Optional (toggle off w/ blanks)</text>
+        </g>
+      </g>
+
+      <g transform="translate(0,300)">
+        <rect width="580" height="60" rx="10" fill="#0f172a"/>
+        <text x="14" y="24" font-size="12" font-weight="700" fill="#bbf7d0">Bot catalog &#183; bots/__init__.py &#183; declarative BotSpec(...) registry</text>
+        <text x="14" y="44" font-size="11" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#86efac">🌐 translation   &#183;   🇧🇷 trilingual_en_pt_el   &#183;   😂 joke   &#183;   🥗 health_coach   &#183;   ➕ your bot here</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- Browser -->
+  <g transform="translate(1040,140)" filter="url(#cardShadow)">
+    <rect width="200" height="100" rx="14" fill="url(#card)" stroke="#e2e8f0"/>
+    <text x="100" y="34" text-anchor="middle" font-size="13" font-weight="600" fill="#0f172a">📊 React console</text>
+    <text x="100" y="56" text-anchor="middle" font-size="11" fill="#64748b">Vite + Tailwind v4</text>
+    <text x="100" y="74" text-anchor="middle" font-size="11" fill="#64748b">React Router &#183; TanStack</text>
+  </g>
+
+  <!-- LLM provider -->
+  <g transform="translate(1040,340)" filter="url(#cardShadow)">
+    <rect width="200" height="120" rx="14" fill="url(#card)" stroke="#e2e8f0"/>
+    <rect x="20" y="16" width="36" height="36" rx="8" fill="#fffbeb"/>
+    <text x="38" y="40" text-anchor="middle" font-size="16">🤖</text>
+    <text x="64" y="34" font-size="13" font-weight="600" fill="#0f172a">LLM provider</text>
+    <text x="64" y="50" font-size="10" fill="#64748b">OpenAI &#183; LiteLLM &#183; Azure</text>
+    <text x="20" y="78" font-size="11" fill="#475569">Chat completions &#183; vision</text>
+    <text x="20" y="94" font-size="11" fill="#475569">Whisper transcription</text>
+    <text x="20" y="110" font-size="11" fill="#475569">Pluggable base URL</text>
+  </g>
+
+  <!-- Volume -->
+  <g transform="translate(560,624)" filter="url(#cardShadow)">
+    <rect width="160" height="56" rx="10" fill="url(#card)" stroke="#e2e8f0"/>
+    <text x="80" y="22" text-anchor="middle" font-size="12" font-weight="600" fill="#0f172a">🗄  /data volume</text>
+    <text x="80" y="42" text-anchor="middle" font-size="10" fill="#64748b">messages.db (SQLite)</text>
+  </g>
+
+  <!-- Arrows -->
+  <line x1="140" y1="240" x2="140" y2="334" stroke="#94a3b8" stroke-width="2" stroke-dasharray="4 4" marker-end="url(#arrowDim)"/>
+  <text x="148" y="290" font-size="10" fill="#64748b">WhatsApp protocol</text>
+
+  <line x1="330" y1="400" x2="246" y2="400" stroke="#16a34a" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="252" y="392" font-size="10" fill="#16a34a">poll &#183; send &#183; download</text>
+
+  <line x1="950" y1="190" x2="1034" y2="190" stroke="#16a34a" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="970" y="180" font-size="10" fill="#16a34a">/api/* &#183; SPA</text>
+
+  <line x1="950" y1="400" x2="1034" y2="400" stroke="#16a34a" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="960" y="392" font-size="10" fill="#16a34a">REST</text>
+
+  <line x1="640" y1="580" x2="640" y2="618" stroke="#16a34a" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="648" y="606" font-size="10" fill="#16a34a">read/write</text>
+</svg>

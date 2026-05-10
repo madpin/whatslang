@@ -1,0 +1,268 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 900" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">
+  
+  <defs>
+    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#22c55e"/>
+      <stop offset="100%" stop-color="#16a34a"/>
+    </linearGradient>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fafafa"/>
+      <stop offset="100%" stop-color="#f4f4f5"/>
+    </linearGradient>
+    <linearGradient id="bgDark" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0a0a0a"/>
+      <stop offset="100%" stop-color="#111114"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#fafafa"/>
+    </linearGradient>
+    <linearGradient id="cardDark" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1a1a1f"/>
+      <stop offset="100%" stop-color="#15151a"/>
+    </linearGradient>
+    <filter id="cardShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="10" flood-color="#0f172a" flood-opacity="0.10"/>
+    </filter>
+    <filter id="cardShadowDark" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="6" stdDeviation="12" flood-color="#000000" flood-opacity="0.45"/>
+    </filter>
+    <filter id="modalShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="20" stdDeviation="30" flood-color="#0f172a" flood-opacity="0.30"/>
+    </filter>
+  </defs>
+
+  
+  <rect width="1440" height="900" fill="url(#bg)"/>
+
+  <!-- Sidebar -->
+  <g>
+    <rect width="228" height="900" fill="#0a0a0a"/>
+    <g transform="translate(28,40)">
+      <rect width="32" height="32" rx="9" fill="url(#brand)"/>
+      <text x="16" y="22" text-anchor="middle" font-size="14" font-weight="700" fill="white">W</text>
+      <text x="44" y="22" font-size="15" font-weight="700" fill="white">Whatslang</text>
+    </g>
+    <text x="34" y="92" font-size="10" fill="#52525b" letter-spacing="1.4">NAVIGATION</text>
+    <g>
+      <rect x="14" y="110" width="200" height="36" rx="9" fill="#16a34a"/><text x="34" y="132" font-size="13" font-weight="600" fill="white">Dashboard</text>
+      <text x="34" y="176" font-size="13" fill="#a1a1aa">Chats</text>
+      <text x="34" y="220" font-size="13" fill="#a1a1aa">Bots</text>
+      <text x="34" y="264" font-size="13" fill="#a1a1aa">Diagnostics</text>
+      <text x="34" y="308" font-size="13" fill="#a1a1aa">Settings</text>
+    </g>
+    <g transform="translate(28,828)">
+      <rect width="172" height="40" rx="10" fill="#15151a"/>
+      <circle cx="24" cy="20" r="11" fill="#27272a"/>
+      <text x="24" y="24" text-anchor="middle" font-size="11" font-weight="700" fill="#a1a1aa">A</text>
+      <text x="44" y="17" font-size="11" font-weight="600" fill="#e4e4e7">admin</text>
+      <text x="44" y="30" font-size="9" fill="#71717a">signed in</text>
+    </g>
+  </g>
+
+  <!-- Top bar -->
+  <g>
+    <rect x="228" width="1212" height="64" fill="white"/>
+    <line x1="228" y1="64" x2="1440" y2="64" stroke="#e4e4e7"/>
+    <g transform="translate(252,22)">
+      <text font-size="16" font-weight="700" fill="#18181b">Diagnostics</text>
+      <text y="20" font-size="11" fill="#71717a">Live snapshot of gateway, LLM, database and bot runtime</text>
+    </g>
+    <g transform="translate(1140,20)">
+      <rect width="120" height="28" rx="8" fill="#f4f4f5"/>
+      <text x="14" y="18" font-size="11" fill="#71717a">Sync from WhatsApp</text>
+    </g>
+    <g transform="translate(1280,20)">
+      <rect width="100" height="28" rx="8" fill="url(#brand)"/>
+      <text x="50" y="18" text-anchor="middle" font-size="11" font-weight="600" fill="white">+ Add chat</text>
+    </g>
+  </g>
+
+
+  <g transform="translate(252,96)">
+    
+        <g transform="translate(0,0)" filter="url(#cardShadow)">
+          <rect width="540" height="220" rx="14" fill="white" stroke="#e4e4e7"/>
+          <rect width="540" height="40" rx="14" fill="white"/>
+          <rect y="20" width="540" height="20" fill="white"/>
+          <line x1="0" y1="40" x2="540" y2="40" stroke="#f4f4f5"/>
+          <circle cx="22" cy="20" r="6" fill="#16a34a"/>
+          <text x="36" y="25" font-size="13" font-weight="700" fill="#18181b">WhatsApp gateway</text>
+          <g transform="translate(20,68)">
+            
+            <g transform="translate(0,0)">
+              <text x="0" y="14" font-size="11" fill="#71717a">Base URL</text>
+              <text x="540" y="14" text-anchor="end" font-size="11" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#18181b">http://wa-gateway:8081</text>
+            </g>
+            <g transform="translate(0,26)">
+              <text x="0" y="14" font-size="11" fill="#71717a">Reachable</text>
+              <text x="540" y="14" text-anchor="end" font-size="11" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#18181b">✓ yes</text>
+            </g>
+            <g transform="translate(0,52)">
+              <text x="0" y="14" font-size="11" fill="#71717a">HTTP status</text>
+              <text x="540" y="14" text-anchor="end" font-size="11" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#18181b">200 (38 ms)</text>
+            </g>
+            <g transform="translate(0,78)">
+              <text x="0" y="14" font-size="11" fill="#71717a">Logged in</text>
+              <text x="540" y="14" text-anchor="end" font-size="11" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#18181b">✓ yes</text>
+            </g>
+            <g transform="translate(0,104)">
+              <text x="0" y="14" font-size="11" fill="#71717a">Device JID</text>
+              <text x="540" y="14" text-anchor="end" font-size="11" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#18181b">12345...whatsapp.net</text>
+            </g>
+            <g transform="translate(0,130)">
+              <text x="0" y="14" font-size="11" fill="#71717a">Calls / errors</text>
+              <text x="540" y="14" text-anchor="end" font-size="11" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#18181b">12 483 / 0</text>
+            </g>
+          </g>
+        </g>
+        <g transform="translate(580,0)" filter="url(#cardShadow)">
+          <rect width="540" height="220" rx="14" fill="white" stroke="#e4e4e7"/>
+          <rect width="540" height="40" rx="14" fill="white"/>
+          <rect y="20" width="540" height="20" fill="white"/>
+          <line x1="0" y1="40" x2="540" y2="40" stroke="#f4f4f5"/>
+          <circle cx="22" cy="20" r="6" fill="#0ea5e9"/>
+          <text x="36" y="25" font-size="13" font-weight="700" fill="#18181b">LLM provider</text>
+          <g transform="translate(20,68)">
+            
+            <g transform="translate(0,0)">
+              <text x="0" y="14" font-size="11" fill="#71717a">Base URL</text>
+              <text x="540" y="14" text-anchor="end" font-size="11" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#18181b">https://api.openai.com/v1</text>
+            </g>
+            <g transform="translate(0,26)">
+              <text x="0" y="14" font-size="11" fill="#71717a">Text model</text>
+              <text x="540" y="14" text-anchor="end" font-size="11" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#18181b">gpt-4o-mini</text>
+            </g>
+            <g transform="translate(0,52)">
+              <text x="0" y="14" font-size="11" fill="#71717a">Vision model</text>
+              <text x="540" y="14" text-anchor="end" font-size="11" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#18181b">gpt-4o-mini</text>
+            </g>
+            <g transform="translate(0,78)">
+              <text x="0" y="14" font-size="11" fill="#71717a">Audio model</text>
+              <text x="540" y="14" text-anchor="end" font-size="11" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#18181b">whisper-1</text>
+            </g>
+            <g transform="translate(0,104)">
+              <text x="0" y="14" font-size="11" fill="#71717a">API key set</text>
+              <text x="540" y="14" text-anchor="end" font-size="11" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#18181b">✓ yes</text>
+            </g>
+            <g transform="translate(0,130)">
+              <text x="0" y="14" font-size="11" fill="#71717a">Note</text>
+              <text x="540" y="14" text-anchor="end" font-size="11" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#18181b">no live probe (saves $)</text>
+            </g>
+          </g>
+        </g>
+        <g transform="translate(0,240)" filter="url(#cardShadow)">
+          <rect width="540" height="220" rx="14" fill="white" stroke="#e4e4e7"/>
+          <rect width="540" height="40" rx="14" fill="white"/>
+          <rect y="20" width="540" height="20" fill="white"/>
+          <line x1="0" y1="40" x2="540" y2="40" stroke="#f4f4f5"/>
+          <circle cx="22" cy="20" r="6" fill="#a855f7"/>
+          <text x="36" y="25" font-size="13" font-weight="700" fill="#18181b">Database</text>
+          <g transform="translate(20,68)">
+            
+            <g transform="translate(0,0)">
+              <text x="0" y="14" font-size="11" fill="#71717a">Path</text>
+              <text x="540" y="14" text-anchor="end" font-size="11" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#18181b">/data/messages.db</text>
+            </g>
+            <g transform="translate(0,26)">
+              <text x="0" y="14" font-size="11" fill="#71717a">Size</text>
+              <text x="540" y="14" text-anchor="end" font-size="11" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#18181b">1.2 MiB</text>
+            </g>
+            <g transform="translate(0,52)">
+              <text x="0" y="14" font-size="11" fill="#71717a">Chats</text>
+              <text x="540" y="14" text-anchor="end" font-size="11" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#18181b">47</text>
+            </g>
+            <g transform="translate(0,78)">
+              <text x="0" y="14" font-size="11" fill="#71717a">Assignments</text>
+              <text x="540" y="14" text-anchor="end" font-size="11" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#18181b">12</text>
+            </g>
+            <g transform="translate(0,104)">
+              <text x="0" y="14" font-size="11" fill="#71717a">Processed msgs</text>
+              <text x="540" y="14" text-anchor="end" font-size="11" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#18181b">9 821</text>
+            </g>
+            <g transform="translate(0,130)">
+              <text x="0" y="14" font-size="11" fill="#71717a">WAL</text>
+              <text x="540" y="14" text-anchor="end" font-size="11" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#18181b">✓ on</text>
+            </g>
+          </g>
+        </g>
+        <g transform="translate(580,240)" filter="url(#cardShadow)">
+          <rect width="540" height="220" rx="14" fill="white" stroke="#e4e4e7"/>
+          <rect width="540" height="40" rx="14" fill="white"/>
+          <rect y="20" width="540" height="20" fill="white"/>
+          <line x1="0" y1="40" x2="540" y2="40" stroke="#f4f4f5"/>
+          <circle cx="22" cy="20" r="6" fill="#f59e0b"/>
+          <text x="36" y="25" font-size="13" font-weight="700" fill="#18181b">Bot runtime</text>
+          <g transform="translate(20,68)">
+            
+            <g transform="translate(0,0)">
+              <text x="0" y="14" font-size="11" fill="#71717a">Catalog size</text>
+              <text x="540" y="14" text-anchor="end" font-size="11" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#18181b">4</text>
+            </g>
+            <g transform="translate(0,26)">
+              <text x="0" y="14" font-size="11" fill="#71717a">Running bots</text>
+              <text x="540" y="14" text-anchor="end" font-size="11" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#18181b">8</text>
+            </g>
+            <g transform="translate(0,52)">
+              <text x="0" y="14" font-size="11" fill="#71717a">Poll interval</text>
+              <text x="540" y="14" text-anchor="end" font-size="11" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#18181b">5 s</text>
+            </g>
+            <g transform="translate(0,78)">
+              <text x="0" y="14" font-size="11" fill="#71717a">Threads</text>
+              <text x="540" y="14" text-anchor="end" font-size="11" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#18181b">8 alive</text>
+            </g>
+            <g transform="translate(0,104)">
+              <text x="0" y="14" font-size="11" fill="#71717a">Last error</text>
+              <text x="540" y="14" text-anchor="end" font-size="11" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#18181b">—</text>
+            </g>
+            <g transform="translate(0,130)">
+              <text x="0" y="14" font-size="11" fill="#71717a">Uptime</text>
+              <text x="540" y="14" text-anchor="end" font-size="11" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" fill="#18181b">3 d 7 h</text>
+            </g>
+          </g>
+        </g>
+  </g>
+
+  <!-- Recent errors -->
+  <g transform="translate(252,592)" filter="url(#cardShadow)">
+    <rect width="1140" height="248" rx="14" fill="white" stroke="#e4e4e7"/>
+    <g transform="translate(24,28)">
+      <text font-size="13" font-weight="700" fill="#18181b">Recent gateway errors</text>
+      <text y="18" font-size="11" fill="#71717a">Last 3 non-2xx responses from the WhatsApp gateway.</text>
+    </g>
+    <g transform="translate(24,80)">
+      <text x="0" y="14" font-size="10" font-weight="700" fill="#71717a" letter-spacing="1">TIME</text>
+      <text x="80" y="14" font-size="10" font-weight="700" fill="#71717a" letter-spacing="1">ENDPOINT</text>
+      <text x="200" y="14" font-size="10" font-weight="700" fill="#71717a" letter-spacing="1">STATUS</text>
+      <text x="264" y="14" font-size="10" font-weight="700" fill="#71717a" letter-spacing="1">MESSAGE</text>
+      <line x1="0" y1="22" x2="1080" y2="22" stroke="#f4f4f5"/>
+      <g transform="translate(0,32)">
+        
+        <g transform="translate(0,0)">
+          <text x="0" y="20" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#a1a1aa">16:38:12</text>
+          <rect x="80" y="6" width="100" height="20" rx="6" fill="#f4f4f5"/>
+          <text x="130" y="20" text-anchor="middle" font-size="11" font-weight="600" fill="#52525b">get_messages</text>
+          <rect x="200" y="6" width="44" height="20" rx="6" fill="#fee2e2"/>
+          <text x="222" y="20" text-anchor="middle" font-size="11" font-weight="700" fill="#b91c1c">502</text>
+          <text x="264" y="20" font-size="11" fill="#27272a">upstream timeout</text>
+        </g>
+        <g transform="translate(0,32)">
+          <text x="0" y="20" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#a1a1aa">12:04:09</text>
+          <rect x="80" y="6" width="100" height="20" rx="6" fill="#f4f4f5"/>
+          <text x="130" y="20" text-anchor="middle" font-size="11" font-weight="600" fill="#52525b">send_message</text>
+          <rect x="200" y="6" width="44" height="20" rx="6" fill="#fee2e2"/>
+          <text x="222" y="20" text-anchor="middle" font-size="11" font-weight="700" fill="#b91c1c">429</text>
+          <text x="264" y="20" font-size="11" fill="#27272a">rate limit, retry after 12s</text>
+        </g>
+        <g transform="translate(0,64)">
+          <text x="0" y="20" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#a1a1aa">08:51:42</text>
+          <rect x="80" y="6" width="100" height="20" rx="6" fill="#f4f4f5"/>
+          <text x="130" y="20" text-anchor="middle" font-size="11" font-weight="600" fill="#52525b">download_audio</text>
+          <rect x="200" y="6" width="44" height="20" rx="6" fill="#fee2e2"/>
+          <text x="222" y="20" text-anchor="middle" font-size="11" font-weight="700" fill="#b91c1c">404</text>
+          <text x="264" y="20" font-size="11" fill="#27272a">media not found</text>
+        </g>
+      </g>
+    </g>
+  </g>
+</svg>

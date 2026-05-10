@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 480" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">
+  <defs>
+    <linearGradient id="hbg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#052e16"/>
+      <stop offset="55%" stop-color="#064e3b"/>
+      <stop offset="100%" stop-color="#0c0a09"/>
+    </linearGradient>
+    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#22c55e"/>
+      <stop offset="100%" stop-color="#16a34a"/>
+    </linearGradient>
+    <radialGradient id="hglow" cx="80%" cy="20%" r="60%">
+      <stop offset="0%" stop-color="#22c55e" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#22c55e" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="cardShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="20" stdDeviation="30" flood-color="#000000" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+
+  <rect width="1280" height="480" fill="url(#hbg)"/>
+  <rect width="1280" height="480" fill="url(#hglow)"/>
+
+  <!-- Left: branding + tagline -->
+  <g transform="translate(80,110)">
+    <g>
+      <rect width="60" height="60" rx="16" fill="url(#brand)"/>
+      <text x="30" y="40" text-anchor="middle" font-size="28" font-weight="800" fill="white">W</text>
+    </g>
+    <text x="80" y="40" font-size="40" font-weight="800" fill="white">Whatslang</text>
+    <text y="92" font-size="15" fill="#86efac" letter-spacing="2">MODULAR &#8226; MULTIMODAL &#8226; OPEN</text>
+    <text y="148" font-size="22" font-weight="600" fill="#f0fdf4">Modular WhatsApp bots</text>
+    <text y="178" font-size="22" font-weight="600" fill="#f0fdf4">with a sleek admin console.</text>
+    <text y="220" font-size="13" fill="#bbf7d0">Declarative bot specs &#183; per-chat tuning &#183;</text>
+    <text y="240" font-size="13" fill="#bbf7d0">multimodal LLM (text &#183; vision &#183; audio &#183; video)</text>
+    <text y="260" font-size="13" fill="#bbf7d0">&#183; one container.</text>
+
+    <g transform="translate(0,290)">
+      <rect width="160" height="40" rx="10" fill="url(#brand)"/>
+      <text x="80" y="26" text-anchor="middle" font-size="13" font-weight="700" fill="white">Get started</text>
+
+      <rect x="176" width="140" height="40" rx="10" fill="none" stroke="#86efac"/>
+      <text x="246" y="26" text-anchor="middle" font-size="13" font-weight="600" fill="#86efac">Read the docs</text>
+    </g>
+  </g>
+
+  <!-- Right: stylised dashboard preview -->
+  <g transform="translate(700,80)" filter="url(#cardShadow)">
+    <rect width="500" height="320" rx="18" fill="#0a0a0a" stroke="#1f2937"/>
+    <!-- Top bar -->
+    <rect width="500" height="40" rx="18" fill="#111114"/>
+    <rect y="18" width="500" height="22" fill="#111114"/>
+    <circle cx="20" cy="20" r="5" fill="#ef4444"/>
+    <circle cx="40" cy="20" r="5" fill="#f59e0b"/>
+    <circle cx="60" cy="20" r="5" fill="#22c55e"/>
+    <text x="250" y="25" text-anchor="middle" font-size="11" fill="#71717a">whatslang.app &#183; Dashboard</text>
+
+    <!-- KPI row -->
+    <g transform="translate(20,60)" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">
+      <g>
+        <rect width="100" height="64" rx="10" fill="#0c0c10" stroke="#1f2937"/>
+        <text x="14" y="22" font-size="9" fill="#71717a">TOTAL CHATS</text>
+        <text x="14" y="48" font-size="22" font-weight="700" fill="#22c55e">47</text>
+      </g>
+      <g transform="translate(112,0)">
+        <rect width="100" height="64" rx="10" fill="#0c0c10" stroke="#1f2937"/>
+        <text x="14" y="22" font-size="9" fill="#71717a">RUNNING BOTS</text>
+        <text x="14" y="48" font-size="22" font-weight="700" fill="#86efac">8</text>
+      </g>
+      <g transform="translate(224,0)">
+        <rect width="100" height="64" rx="10" fill="#0c0c10" stroke="#1f2937"/>
+        <text x="14" y="22" font-size="9" fill="#71717a">BOT TYPES</text>
+        <text x="14" y="48" font-size="22" font-weight="700" fill="#f4f4f5">4</text>
+      </g>
+      <g transform="translate(336,0)">
+        <rect width="124" height="64" rx="10" fill="#0c0c10" stroke="#1f2937"/>
+        <text x="14" y="22" font-size="9" fill="#71717a">ACTIVE 24H</text>
+        <text x="14" y="48" font-size="22" font-weight="700" fill="#f4f4f5">12</text>
+      </g>
+    </g>
+
+    <!-- Recent activity card -->
+    <g transform="translate(20,148)">
+      <rect width="460" height="148" rx="10" fill="#0c0c10" stroke="#1f2937"/>
+      <text x="14" y="22" font-size="11" font-weight="700" fill="#e4e4e7">Recent activity</text>
+      <g transform="translate(14,38)" font-size="10">
+        <text fill="#22c55e">[ai]</text>
+        <text x="34" fill="#a1a1aa">Friends &#183; Translated to PT</text>
+        <text x="430" text-anchor="end" fill="#52525b">2m</text>
+
+        <text y="22" fill="#22c55e">[health]</text>
+        <text x="56" y="22" fill="#a1a1aa">DM Alex &#183; 480 kcal estimate</text>
+        <text x="430" y="22" text-anchor="end" fill="#52525b">5m</text>
+
+        <text y="44" fill="#22c55e">[joke]</text>
+        <text x="42" y="44" fill="#a1a1aa">Family group &#183; pun about coffee</text>
+        <text x="430" y="44" text-anchor="end" fill="#52525b">12m</text>
+
+        <text y="66" fill="#22c55e">[tri]</text>
+        <text x="34" y="66" fill="#a1a1aa">Greek travel &#183; EN/PT/EL output</text>
+        <text x="430" y="66" text-anchor="end" fill="#52525b">22m</text>
+      </g>
+    </g>
+  </g>
+
+  <text x="80" y="448" font-size="11" fill="#52525b">FastAPI &#183; React &#183; SQLite &#183; Tailwind &#183; Docker &#183; MIT licence</text>
+</svg>

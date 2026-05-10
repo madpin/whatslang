@@ -1,39 +1,153 @@
-# Whatslang
+<!-- markdownlint-disable MD033 MD041 -->
+<p align="center">
+  <img src="docs/images/hero.svg" alt="Whatslang — modular WhatsApp bots with a sleek admin console" width="100%">
+</p>
 
-A modular WhatsApp bot service with a sleek admin console, a declarative bot
-framework, and a single-user, env-driven login. Built on FastAPI, SQLite, and
-a Vite/React/TypeScript dashboard.
+<h1 align="center">Whatslang</h1>
 
+<p align="center">
+  <strong>Modular, multimodal WhatsApp bots with a sleek admin console.</strong><br>
+  Declarative bot specs · multimodal LLM (text · vision · audio · video) · per-chat tuning · single container.
+</p>
+
+<p align="center">
+  <a href="#-quick-start"><img alt="Quick start" src="https://img.shields.io/badge/quick%20start-5%20min-22c55e?style=for-the-badge"></a>
+  <img alt="Python" src="https://img.shields.io/badge/python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white">
+  <img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-0.115-009688?style=for-the-badge&logo=fastapi&logoColor=white">
+  <img alt="React" src="https://img.shields.io/badge/React-19-149ECA?style=for-the-badge&logo=react&logoColor=white">
+  <img alt="Tailwind CSS" src="https://img.shields.io/badge/Tailwind-v4-38BDF8?style=for-the-badge&logo=tailwindcss&logoColor=white">
+  <img alt="Docker" src="https://img.shields.io/badge/Docker-ready-2496ED?style=for-the-badge&logo=docker&logoColor=white">
+  <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-0ea5e9?style=for-the-badge">
+</p>
+
+<p align="center">
+  <a href="USAGE.md">Usage guide</a> ·
+  <a href="docs/architecture.md">Architecture</a> ·
+  <a href="docs/bots.md">Writing bots</a> ·
+  <a href="docs/configuration.md">Configuration</a> ·
+  <a href="docs/deployment.md">Deployment</a> ·
+  <a href="docs/api.md">REST API</a> ·
+  <a href="docs/troubleshooting.md">Troubleshooting</a>
+</p>
+
+---
+
+## Why Whatslang?
+
+> Most WhatsApp-bot frameworks ask you to wire threads, polling loops, media
+> pipelines, and a UI from scratch. **Whatslang** gives you all of that in one
+> small FastAPI process — and lets you ship a new bot by writing a *single*
+> dataclass.
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+
+### Bot author experience
+
+```python
+register(
+    BotSpec(
+        name="echo",
+        label="Echo",
+        prefix="[echo]",
+        emoji="🔁",
+        description="Repeats whatever you say.",
+        text_system_prompt=(
+            "You are a polite echo. "
+            "Repeat the user's text verbatim."
+        ),
+    )
+)
 ```
-┌────────────────────┐      ┌──────────────────────┐      ┌────────────────┐
-│  WhatsApp Gateway  │ ◀──▶ │  Whatslang Backend   │ ◀──▶ │  React Console │
-│  (whatsapp-mcp)    │      │  (FastAPI · SQLite)  │      │  (Vite/Tailwind)│
-└────────────────────┘      └──────────┬───────────┘      └────────────────┘
-                                       │
-                                       ▼
-                              ┌──────────────────┐
-                              │   LLM (OpenAI    │
-                              │   / LiteLLM)     │
-                              └──────────────────┘
-```
 
-## Highlights
+That's the whole bot. Threading, polling, deduplication,
+self-message gating, response splitting, image/audio/video,
+per-chat overrides — all handled by the runner.
 
-- **Sleek admin console** — dashboard, chats, bots, settings, dark/light themes,
-  toasts, modals, search, filters, pagination.
-- **Declarative bots** — adding a bot is a few-line `BotSpec` in
-  `app/bots/__init__.py`. No more wiring threads, polling loops, or media
-  pipelines by hand.
-- **Multimodal out of the box** — text, image (vision), audio (Whisper), and
-  video → audio transcription handled in one place.
-- **Multiple bots per chat** — start and stop any combination of bots in any
-  chat, with independent settings (context size, self-answer, redirect target).
-- **Single-user auth** — username and password are env vars; sessions are
-  HMAC-signed cookies. Leave both empty to disable auth on private networks.
-- **One container, two stages** — Vite builds the SPA, FastAPI serves it from
-  `/web/dist`. No Nginx required.
+</td>
+    <td width="50%" valign="top">
 
-## Quick start
+### Operator experience
+
+- **Dashboard** with KPIs, recent activity, and bot status
+- **Chats list** with search, filters, sort, pagination, bulk actions
+- **Per-chat bot management** — toggle bots, configure context size,
+  redirect responses to another chat
+- **Live diagnostics** for the gateway, LLM, database, and bot runtime
+- **Logs modal** with the last N events for any (bot, chat) pair
+- **Dark mode**, toasts, modals, optimistic UI
+
+</td>
+  </tr>
+</table>
+
+---
+
+## ✨ Highlights
+
+| | |
+|---|---|
+| **🧩 Declarative bots** | A bot is a `BotSpec` — name, prefix, system prompt, optional image/audio modes. The runner does the rest. |
+| **🎙 Multimodal** | Text, image (vision), audio (Whisper), and video → audio transcription handled in one place. |
+| **👥 Multiple bots per chat** | Run any combination of bots per chat. Each has its own context size, self-answer toggle, and optional response redirect. |
+| **🛡 Single-user auth** | Username and password come from env vars; sessions are HMAC-signed cookies. Leave them blank to disable auth on private networks. |
+| **🪶 One container** | Vite builds the SPA, FastAPI serves it from `/web/dist`. No Nginx, no separate API gateway. |
+| **🚀 PaaS-ready** | Ships with `Dockerfile`, `docker-compose.yml`, `nixpacks.toml`, **and** `railpack.json`. |
+| **🔍 Live diagnostics** | `/api/diagnostics` and an in-app page show gateway latency, LLM config, DB stats, recent errors. |
+| **🧠 LLM-agnostic** | Any OpenAI-compatible endpoint — OpenAI, Azure OpenAI, LiteLLM, vLLM, llama.cpp's openai server. |
+
+---
+
+## 🖼 The dashboard at a glance
+
+<table>
+  <tr>
+    <td align="center" colspan="2"><strong>Dashboard — light & dark</strong></td>
+  </tr>
+  <tr>
+    <td><img src="docs/images/dashboard-light.svg" alt="Dashboard, light theme"></td>
+    <td><img src="docs/images/dashboard-dark.svg" alt="Dashboard, dark theme"></td>
+  </tr>
+  <tr>
+    <td align="center"><strong>All chats — searchable, sortable, paginated</strong></td>
+    <td align="center"><strong>Per-chat bot management</strong></td>
+  </tr>
+  <tr>
+    <td><img src="docs/images/chats.svg" alt="Chats list with filters and bulk actions"></td>
+    <td><img src="docs/images/chat-detail.svg" alt="Chat detail with bot assignments"></td>
+  </tr>
+  <tr>
+    <td align="center"><strong>Bots catalog</strong></td>
+    <td align="center"><strong>Live diagnostics</strong></td>
+  </tr>
+  <tr>
+    <td><img src="docs/images/bots.svg" alt="Bots catalog"></td>
+    <td><img src="docs/images/diagnostics.svg" alt="Diagnostics page"></td>
+  </tr>
+  <tr>
+    <td align="center"><strong>Per-bot settings</strong></td>
+    <td align="center"><strong>Per-bot live logs</strong></td>
+  </tr>
+  <tr>
+    <td><img src="docs/images/bot-settings-modal.svg" alt="Bot settings modal"></td>
+    <td><img src="docs/images/bot-logs-modal.svg" alt="Bot logs modal"></td>
+  </tr>
+</table>
+
+> The full walkthrough — including login, settings, and what bots look like
+> from the WhatsApp side — lives in **[USAGE.md](USAGE.md)**.
+
+---
+
+## 🚀 Quick start
+
+### 0. Stand up a WhatsApp gateway
+
+Whatslang doesn't talk to WhatsApp directly. It speaks REST to a
+`whatsapp-mcp` / `wha-mcp`-compatible gateway that you bring yourself.
+Any service that exposes `GET /chats`, `GET /messages`, `POST /send`,
+`GET /download/...` will do.
 
 ### 1. Configure
 
@@ -42,111 +156,124 @@ cp .env.example .env
 $EDITOR .env
 ```
 
-At minimum you need a `WHATSAPP_BASE_URL` and an `OPENAI_API_KEY` (or any
-LiteLLM-compatible endpoint via `OPENAI_BASE_URL`). To enable the dashboard
-login, set both `DASHBOARD_USER` and `DASHBOARD_PASSWORD`.
+You need at minimum:
 
-### 2. Backend (Python 3.10+)
+- `WHATSAPP_BASE_URL` (and credentials, if your gateway requires them)
+- `OPENAI_API_KEY` (any LiteLLM-compatible endpoint via `OPENAI_BASE_URL` works too)
+- `DASHBOARD_USER` + `DASHBOARD_PASSWORD` (set both to enable login; leave both blank to disable auth)
+
+See [docs/configuration.md](docs/configuration.md) for every variable.
+
+### 2. Run the backend (Python 3.10+)
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-python -m app           # http://localhost:8000
+python -m app                       # http://localhost:8000
 ```
 
-API docs live at `http://localhost:8000/api/docs` when
+The interactive API docs live at `http://localhost:8000/api/docs` when
 `ENVIRONMENT=development`.
 
-### 3. Frontend (Node 20+)
+### 3. Run the frontend (Node 20+)
 
 ```bash
 cd web
 npm install
-npm run dev             # http://localhost:5173 (proxies /api to :8000)
+npm run dev                         # http://localhost:5173 (proxies /api → :8000)
 ```
 
-For production, run `npm run build` once — the FastAPI app picks up
-`web/dist/` automatically and serves the SPA + assets.
+For production, run `npm run build` once — FastAPI auto-serves `web/dist/`.
 
-## Docker
+### 4. Or, just one command
 
 ```bash
 docker compose up --build
 ```
 
-The compose file mounts a `whatslang-data` volume to `/data` so SQLite state
-survives upgrades. Healthchecks hit `/health`.
+The compose file mounts a `whatslang-data` volume to `/data` so SQLite
+state survives upgrades. The container exposes `/health` for orchestrators.
 
-## PaaS deployments (Nixpacks / Railpack)
+> Need PaaS? `nixpacks.toml` and `railpack.json` are both committed —
+> see [docs/deployment.md](docs/deployment.md).
 
-The repo ships with both build plans — pick whichever your platform speaks. No
-extra service, no buildpacks: a single image that builds the SPA, installs
-Python deps, then runs uvicorn.
+---
 
-| Platform                     | Use                |
-|------------------------------|--------------------|
-| Dokploy, Coolify, older Railway | `nixpacks.toml` |
-| Railway (modern), self-hosted Railpack | `railpack.json` |
+## 🤖 Built-in bot catalog
 
-### Nixpacks (`nixpacks.toml`)
+| Emoji | Name | Prefix | What it does |
+|---|---|---|---|
+| 🌐 | `translation` | `[ai]` | EN ↔ PT translator. Auto-detects source language. Handles text, OCR on images, voice notes (Whisper), and video audio tracks. |
+| 🇧🇷🇬🇷 | `trilingual_en_pt_el` | `[tri]` | English → BOTH Portuguese (BR) and Greek; anything else → English. Multimodal. |
+| 😂 | `joke` | `[joke]` | Replies with a short, family-friendly joke matching the user's language. Text-only. |
+| 🥗 | `health_coach` | `[health]` | Empathic but honest coach. Estimates kcal & macros from food photos. Transcribes voice notes. |
 
-- Setup: Python 3.11, Node 22, ffmpeg, curl, CA certs (pinned nixpkgs).
-- Install: `pip install -r requirements.txt` into `/opt/venv` (cached).
-- Build: `cd web && npm ci && npm run build` (npm + node_modules cached).
-- Start: `python -m uvicorn app.main:app …` from the venv.
+A bot can be started in any chat, configured per chat, and stopped — without
+restarting the server.
 
-### Railpack (`railpack.json`)
+<p align="center">
+  <img src="docs/images/whatsapp-conversation.svg" alt="What bots look like inside WhatsApp" width="80%">
+</p>
 
-- Provider: `python` (auto-detects `requirements.txt`).
-- Packages: `python 3.11` + `node 22` via mise.
-- Custom steps: `frontend:install` → `frontend:build` (with `npm` cache layers).
-- Deploy: `web/dist` is layered on top of the Python deploy image, plus
-  `ffmpeg` / `curl` / `ca-certificates` as runtime apt packages.
-- Start: `python -m uvicorn app.main:app …`.
+---
 
-### Required env vars (both)
+## 🧩 Adding a new bot
 
-Provide the variables from `.env.example`:
-
-- `WHATSAPP_BASE_URL`, `WHATSAPP_API_USER`, `WHATSAPP_API_PASSWORD`, `DEVICE_ID`
-- `OPENAI_API_KEY` (and optionally `OPENAI_BASE_URL`, model overrides)
-- `DASHBOARD_USER`, `DASHBOARD_PASSWORD`, `SESSION_SECRET` (set the secret to a
-  long random string so cookies survive restarts)
-- `DB_PATH=/data/messages.db` and a writable persistent volume mounted at
-  `/data`
-
-### Healthcheck
-
-Both plans serve `GET /health` (and `/api/health`) returning `200 OK` once the
-app is up — wire it up as the platform's healthcheck.
-
-## Adding a new bot
-
-Edit `app/bots/__init__.py` and append a `BotSpec`:
+Edit `app/bots/__init__.py`:
 
 ```python
-BotSpec(
-    name="echo",
-    label="Echo",
-    prefix="!echo ",
-    emoji="🔁",
-    description="Repeats whatever you say.",
-    text_prompt="You are a polite echo. Repeat the user's text verbatim.",
-    image_mode=MediaMode.IGNORE,
-    audio_mode=MediaMode.IGNORE,
-    video_mode=MediaMode.IGNORE,
-    answer_owner_messages_default=False,
+from app.bots.base import BotSpec, MediaMode, register
+
+register(
+    BotSpec(
+        name="echo",
+        label="Echo",
+        prefix="[echo]",
+        emoji="🔁",
+        description="Repeats whatever you say.",
+        text_system_prompt=(
+            "You are a polite echo. "
+            "Repeat the user's text verbatim."
+        ),
+        # Optional: enable image OCR/vision by setting an image_prompt.
+        # image_prompt="Describe this image in one sentence.",
+        # Optional: how to handle voice notes / video audio tracks.
+        # media_mode=MediaMode.IGNORE,
+    )
 )
 ```
 
-Restart the server. The new bot shows up in the dashboard, can be assigned to
-any chat, and supports per-chat configuration (context size, self-answer,
-response redirection).
+Restart the server. The bot shows up in the dashboard and is ready
+to assign to any chat.
 
-## Project layout
+The full reference — every field, every `MediaMode`, prompt cookbook,
+and how to subclass `BotRunner` for custom logic — is in
+**[docs/bots.md](docs/bots.md)**.
 
-```
+---
+
+## 🏗 Architecture
+
+<p align="center">
+  <img src="docs/images/architecture.svg" alt="Whatslang architecture">
+</p>
+
+A single FastAPI process:
+
+1. Serves the React SPA from `web/dist`.
+2. Talks to a WhatsApp gateway over REST.
+3. Talks to an OpenAI-compatible LLM (text · vision · Whisper).
+4. Persists state in a single SQLite file on a mounted volume.
+5. Runs a small thread per `(bot, chat)` pair, managed by the `BotManager`.
+
+For per-message details, see [docs/architecture.md](docs/architecture.md).
+
+---
+
+## 📂 Project layout
+
+```text
 app/
   config.py            pydantic-settings config
   logging_setup.py     pretty/JSON logging
@@ -155,52 +282,57 @@ app/
   schemas.py           Pydantic request/response models
   deps.py              FastAPI dependency providers
   main.py              app factory + SPA mount + lifespan
-  routers/
-    auth.py
-    bots.py
-    chats.py
-    system.py
-  services/
-    whatsapp.py        WhatsApp gateway client
-    llm.py             OpenAI / LiteLLM client (text/vision/audio)
-    bot_manager.py     Bot lifecycle + ring buffer logs
+  routers/             auth · bots · chats · system
+  services/            whatsapp · llm · bot_manager
   bots/
     base.py            BotSpec, MediaMode, generic BotRunner
-    __init__.py        Declarative catalog
+    __init__.py        Declarative bot catalog
 web/
   src/
     api/               typed fetch client + endpoints
     components/        AppShell, Sidebar, TopBar, primitives
     lib/               theme, toast, auth context, utils
     pages/             Dashboard, Chats, ChatDetail, Bots, Settings, Login
+docs/                  Long-form documentation + screenshots
 ```
 
-## Auth model
+---
 
-- Both `DASHBOARD_USER` and `DASHBOARD_PASSWORD` set → login required.
-- Either empty → auth disabled (handy for trusted networks or other proxies).
-- `SESSION_SECRET` is used to HMAC-sign cookies. Leave blank to auto-generate
-  on boot (sessions invalidate on restart in that case).
+## 📚 Documentation
 
-## Endpoints
+| Doc | What's inside |
+|---|---|
+| [USAGE.md](USAGE.md) | End-to-end walkthrough with screenshots — first login, sync, start a bot, tune it. |
+| [docs/architecture.md](docs/architecture.md) | Process model, threading, per-message lifecycle, persistence. |
+| [docs/bots.md](docs/bots.md) | Full `BotSpec` reference, `MediaMode` enum, prompt cookbook, custom runners. |
+| [docs/configuration.md](docs/configuration.md) | Every environment variable, with examples and defaults. |
+| [docs/deployment.md](docs/deployment.md) | Docker, Nixpacks, Railpack, bare metal, reverse proxies, healthchecks. |
+| [docs/api.md](docs/api.md) | Full REST API reference — every endpoint, request and response shape. |
+| [docs/troubleshooting.md](docs/troubleshooting.md) | Symptom → cause → fix table. |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Local setup and quality bar (ruff, tsc, vite build). |
 
-| Method | Path                              | Purpose                          |
-|--------|-----------------------------------|----------------------------------|
-| GET    | `/api/health`, `/health`          | Liveness                         |
-| GET    | `/api/system`                     | Runtime configuration snapshot   |
-| GET    | `/api/stats`                      | Dashboard KPIs                   |
-| POST   | `/api/auth/login`, `/logout`      | Session management               |
-| GET    | `/api/auth/status`                | Current auth state               |
-| GET    | `/api/bots/types`, `/api/bots`    | Catalog and running instances    |
-| POST   | `/api/bots/{name}/start`,`/stop`  | Per-chat lifecycle               |
-| PUT    | `/api/bots/{name}/settings`       | Per-chat tuning                  |
-| GET    | `/api/bots/{name}/logs`           | Ring-buffer logs                 |
-| GET    | `/api/chats`, `/api/chats/all`    | Filterable list / brief list     |
-| POST   | `/api/chats`, `/api/chats/sync`   | Add manually / sync from gateway |
-| POST   | `/api/chats/bulk`                 | Bulk start/stop/delete           |
-| GET    | `/api/chats/{jid}`                | Chat with bot statuses           |
-| DELETE | `/api/chats/{jid}`                | Remove + stop bots               |
+---
 
-## License
+## 🧪 Quality
 
-MIT — see `LICENSE` if one is present, otherwise add one before publishing.
+```bash
+make lint           # ruff check on app/
+make typecheck      # tsc -b --noEmit in web/
+make check          # both of the above
+```
+
+There's a small `pytest` test suite under `tests/`. CI runs `lint` +
+`typecheck` + `web build` on every push.
+
+Documentation screenshots are built from `scripts/build_docs_images.py`:
+
+```bash
+source .venv/bin/activate
+python scripts/build_docs_images.py    # regenerates docs/images/*.svg
+```
+
+---
+
+## 📜 License
+
+MIT — see `LICENSE`. Built with care, made to be hacked on.
