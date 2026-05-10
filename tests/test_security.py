@@ -22,21 +22,39 @@ from fastapi.testclient import TestClient
         "/foo/../../../../../../etc/passwd",
         # URL-encoded ../ — the regression that previously slipped through.
         "/%2E%2E%2F%2E%2E%2F%2E%2E%2F%2E%2E%2F%2E%2E%2F%2E%2E%2Fetc%2Fpasswd",
-        # Backslashes / null bytes
+        "/%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2fetc%2fpasswd",
+        # Backslashes / null bytes — clients normalise these in different
+        # ways; what matters is the response body, not the status.
         "/..%5C..%5Cetc%5Cpasswd",
         "/foo%00../etc/passwd",
     ],
 )
 def test_spa_does_not_serve_files_outside_web_dist(client: TestClient, path: str):
-    """Whatever the encoding, the SPA fallback must serve index.html, not /etc/passwd."""
+    """Whatever the encoding, the SPA fallback must NEVER serve content
+    from outside ``web/dist``.
+
+    Two acceptable outcomes:
+
+    - ``200`` carrying the SPA index (HTTP client / Starlette delivered
+      the request to the SPA fallback, which returned ``index.html``).
+    - ``404`` (the client/router collapsed the path before it ever
+      reached our handler — also safe; nothing leaked).
+
+    The unsafe outcome is any ``2xx`` whose body looks like ``/etc/passwd``
+    or any other off-disk file. We check that explicitly.
+    """
     res = client.get(path)
-    assert res.status_code == 200, path
-    body = res.text[:200]
-    # The SPA returns the bundled index.html for unknown paths; any leak of
-    # a real /etc/passwd file would start with "##" or contain "root:".
-    assert "<!doctype html>" in body.lower() or "<!DOCTYPE html>" in body
-    assert "root:" not in res.text
-    assert "/bin/" not in res.text
+    assert res.status_code in (200, 404), f"{path}: {res.status_code}"
+    body = res.text
+    # /etc/passwd line shape: ``user:x:uid:gid:gecos:/home:/bin/sh``.
+    # If any of these tokens leak into the body, traversal succeeded.
+    assert "root:" not in body, f"path {path} leaked /etc/passwd"
+    assert ":/bin/" not in body, f"path {path} leaked /etc/passwd"
+    assert "/sbin/nologin" not in body, f"path {path} leaked /etc/passwd"
+    if res.status_code == 200:
+        # Should be the SPA index — fingerprint the test fixture's body.
+        assert "<!doctype html>" in body.lower()
+        assert "test-spa" in body
 
 
 # ---------------------------------------------------------------------------

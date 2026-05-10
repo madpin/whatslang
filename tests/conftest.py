@@ -7,6 +7,11 @@ Each test gets a freshly built app with a known-good environment so that
 The lifespan handler creates a real ``BotManager`` and a real ``Database``
 (both backed by a temp file). That's intentional: the security-relevant
 behaviour we want to verify is end-to-end through the actual stack.
+
+We also synthesise a fake ``web/dist`` so the SPA catch-all route mounts
+the same way as it does in production. Locally ``web/dist`` exists from
+the dev workflow; on CI it usually does not, and we want both code paths
+exercised identically.
 """
 
 from __future__ import annotations
@@ -17,6 +22,15 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+
+# Stable fake-SPA index that the path-traversal test fingerprints to
+# confirm "the SPA fallback served, not a leaked file".
+_FAKE_INDEX_HTML = (
+    "<!doctype html>\n"
+    '<html lang="en"><head><meta charset="UTF-8">'
+    "<title>Whatslang test SPA</title></head>"
+    '<body><div id="root">test-spa</div></body></html>\n'
+)
 
 
 def _set_env(**overrides: str) -> dict[str, str]:
@@ -43,18 +57,41 @@ def temp_db(tmp_path: Path) -> Iterator[Path]:
 
 
 @pytest.fixture
-def app_factory(monkeypatch: pytest.MonkeyPatch, temp_db: Path):
+def fake_web_dist(tmp_path: Path) -> Path:
+    """Build a minimal ``web/dist`` so the SPA catch-all always mounts.
+
+    We include an ``index.html`` (served by the SPA fallback) plus an
+    ``assets/main.js`` so the static mount has at least one file. Tests
+    fingerprint the index body to distinguish the fallback from a
+    successful path-traversal that would have leaked a real file.
+    """
+    web_dist = tmp_path / "web_dist"
+    (web_dist / "assets").mkdir(parents=True)
+    (web_dist / "index.html").write_text(_FAKE_INDEX_HTML, encoding="utf-8")
+    (web_dist / "assets" / "main.js").write_text(
+        "// fake spa asset\n", encoding="utf-8"
+    )
+    return web_dist
+
+
+@pytest.fixture
+def app_factory(
+    monkeypatch: pytest.MonkeyPatch, temp_db: Path, fake_web_dist: Path
+):
     """Returns a factory so individual tests can override env vars."""
 
     def make(**env: str):
         for k, v in _set_env(DB_PATH=str(temp_db), **env).items():
             monkeypatch.setenv(k, v)
+        # The SPA path is computed at import time, so patch the module-
+        # level constant before ``create_app`` reads it.
+        import app.main as _main
+
+        monkeypatch.setattr(_main, "WEB_DIST", fake_web_dist)
         from app.config import get_settings
 
         get_settings.cache_clear()
-        from app.main import create_app
-
-        return create_app()
+        return _main.create_app()
 
     return make
 
