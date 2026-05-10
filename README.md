@@ -27,6 +27,7 @@
   <a href="docs/configuration.md">Configuration</a> ·
   <a href="docs/deployment.md">Deployment</a> ·
   <a href="docs/api.md">REST API</a> ·
+  <a href="docs/security.md">Security</a> ·
   <a href="docs/troubleshooting.md">Troubleshooting</a>
 </p>
 
@@ -91,7 +92,7 @@ per-chat overrides — all handled by the runner.
 | **🧩 Declarative bots** | A bot is a `BotSpec` — name, prefix, system prompt, optional image/audio modes. The runner does the rest. |
 | **🎙 Multimodal** | Text, image (vision), audio (Whisper), and video → audio transcription handled in one place. |
 | **👥 Multiple bots per chat** | Run any combination of bots per chat. Each has its own context size, self-answer toggle, and optional response redirect. |
-| **🛡 Single-user auth** | Username and password come from env vars; sessions are HMAC-signed cookies. Leave them blank to disable auth on private networks. |
+| **🛡 Hardened by default** | Single-user auth, HMAC-signed `SameSite=Strict` cookies, login throttling, strict JID allow-list, path-traversal-safe SPA serving, security headers, redacted error bodies. See [`docs/security.md`](docs/security.md) and [`SECURITY.md`](SECURITY.md). |
 | **🪶 One container** | Vite builds the SPA, FastAPI serves it from `/web/dist`. No Nginx, no separate API gateway. |
 | **🚀 PaaS-ready** | Ships with `Dockerfile`, `docker-compose.yml`, `nixpacks.toml`, **and** `railpack.json`. |
 | **🔍 Live diagnostics** | `/api/diagnostics` and an in-app page show gateway latency, LLM config, DB stats, recent errors. |
@@ -160,9 +161,11 @@ You need at minimum:
 
 - `WHATSAPP_BASE_URL` (and credentials, if your gateway requires them)
 - `OPENAI_API_KEY` (any LiteLLM-compatible endpoint via `OPENAI_BASE_URL` works too)
-- `DASHBOARD_USER` + `DASHBOARD_PASSWORD` (set both to enable login; leave both blank to disable auth)
+- `DASHBOARD_PASSWORD` (and ideally `SESSION_SECRET`). The service refuses
+  to boot in `ENVIRONMENT=production` without them.
 
-See [docs/configuration.md](docs/configuration.md) for every variable.
+See [docs/configuration.md](docs/configuration.md) for every variable and
+[docs/security.md](docs/security.md) for the operator checklist.
 
 ### 2. Run the backend (Python 3.10+)
 
@@ -308,6 +311,8 @@ docs/                  Long-form documentation + screenshots
 | [docs/configuration.md](docs/configuration.md) | Every environment variable, with examples and defaults. |
 | [docs/deployment.md](docs/deployment.md) | Docker, Nixpacks, Railpack, bare metal, reverse proxies, healthchecks. |
 | [docs/api.md](docs/api.md) | Full REST API reference — every endpoint, request and response shape. |
+| [docs/security.md](docs/security.md) | Threat model, defences, operator checklist. **Read before going live.** |
+| [SECURITY.md](SECURITY.md) | Security policy and how to report vulnerabilities. |
 | [docs/troubleshooting.md](docs/troubleshooting.md) | Symptom → cause → fix table. |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Local setup and quality bar (ruff, tsc, vite build). |
 
@@ -321,8 +326,14 @@ make typecheck      # tsc -b --noEmit in web/
 make check          # both of the above
 ```
 
-There's a small `pytest` test suite under `tests/`. CI runs `lint` +
-`typecheck` + `web build` on every push.
+A `pytest` test suite under `tests/` covers the security model end-to-end
+(see [`docs/security.md`](docs/security.md)). CI runs `lint` +
+`typecheck` + `pytest` + `web build` on every push.
+
+```bash
+source .venv/bin/activate
+pytest                       # 35 tests; full security regressions
+```
 
 Documentation screenshots are built from `scripts/build_docs_images.py`:
 

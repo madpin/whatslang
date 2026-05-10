@@ -43,6 +43,7 @@ def _secret(settings: Settings) -> bytes:
     if settings.session_secret:
         return settings.session_secret.encode()
     # Cache a stable per-process secret if none is configured.
+    # Token length: 32 random bytes = 256 bits, sufficient for HMAC-SHA256.
     global _RUNTIME_SECRET
     if not _RUNTIME_SECRET:
         _RUNTIME_SECRET = secrets.token_bytes(32)

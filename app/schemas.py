@@ -2,15 +2,19 @@
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from app.security import is_valid_chat_jid
 
 
 # ----- Auth -----------------------------------------------------------------
 class LoginRequest(BaseModel):
-    user: Optional[str] = None
-    password: str
+    # Bound the input so a client can't ship a megabyte of password to chew
+    # CPU in the constant-time comparison.
+    user: Optional[str] = Field(default=None, max_length=128)
+    password: str = Field(..., min_length=1, max_length=512)
 
 
 class AuthStatus(BaseModel):
@@ -100,19 +104,49 @@ class ChatListResponse(BaseModel):
 
 
 class AddChatRequest(BaseModel):
-    chat_jid: str
-    chat_name: Optional[str] = None
+    chat_jid: str = Field(..., max_length=200)
+    chat_name: Optional[str] = Field(default=None, max_length=200)
+
+    @field_validator("chat_jid")
+    @classmethod
+    def _check_chat_jid(cls, v: str) -> str:
+        if not is_valid_chat_jid(v):
+            raise ValueError("Invalid chat JID")
+        return v.strip()
+
+
+# Cap bulk actions so a single request can't fan out into thousands of
+# gateway calls (rate limits, accidental DoS, accidental damage).
+_BULK_MAX_ITEMS = 200
 
 
 class BulkActionRequest(BaseModel):
-    chat_jids: list[str]
-    action: str  # 'start_bots' | 'stop_bots' | 'delete_chats'
+    chat_jids: list[str] = Field(..., max_length=_BULK_MAX_ITEMS)
+    action: Literal["start_bots", "stop_bots", "delete_chats"]
+
+    @field_validator("chat_jids")
+    @classmethod
+    def _check_chat_jids(cls, v: list[str]) -> list[str]:
+        for jid in v:
+            if not is_valid_chat_jid(jid):
+                raise ValueError(f"Invalid chat JID: {jid!r}")
+        return v
 
 
 class BotSettingsUpdate(BaseModel):
     answer_owner_messages: Optional[bool] = None
-    context_message_count: Optional[int] = None
-    response_chat_jid: Optional[str] = None  # empty string clears it
+    context_message_count: Optional[int] = Field(default=None, ge=0, le=10_000)
+    # Empty string clears it; otherwise must be a real JID we already know.
+    response_chat_jid: Optional[str] = Field(default=None, max_length=200)
+
+    @field_validator("response_chat_jid")
+    @classmethod
+    def _check_target(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or v.strip() == "":
+            return v
+        if not is_valid_chat_jid(v):
+            raise ValueError("Invalid response_chat_jid")
+        return v.strip()
 
 
 # ----- System ---------------------------------------------------------------

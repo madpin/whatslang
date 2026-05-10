@@ -2,7 +2,7 @@
 
 .PHONY: help venv install install-dev dev run web-install web-dev web-build \
         docker-build docker-up docker-down docker-logs docker-restart \
-        format lint typecheck check clean backup health
+        format lint test typecheck check clean backup health
 
 help:
 	@echo "Whatslang"
@@ -30,8 +30,9 @@ help:
 	@echo "Quality"
 	@echo "  make format        ruff format"
 	@echo "  make lint          ruff check"
+	@echo "  make test          pytest"
 	@echo "  make typecheck     web typecheck (tsc -b --noEmit)"
-	@echo "  make check         lint + typecheck"
+	@echo "  make check         lint + test + typecheck"
 	@echo ""
 	@echo "Misc"
 	@echo "  make clean         Remove caches"
@@ -93,15 +94,19 @@ docker-restart:
 	docker compose restart
 
 format:
-	ruff format app
+	ruff format app tests
 
 lint:
-	ruff check app
+	ruff check app tests
+
+test:
+	@if [ -z "$$VIRTUAL_ENV" ]; then echo "Activate .venv first"; exit 1; fi
+	pytest
 
 typecheck:
 	cd web && npm run typecheck
 
-check: lint typecheck
+check: lint test typecheck
 
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true

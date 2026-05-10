@@ -22,6 +22,7 @@ from app.routers import auth as auth_router
 from app.routers import bots as bots_router
 from app.routers import chats as chats_router
 from app.routers import system as system_router
+from app.security import redact_error, safe_static_path
 from app.services.bot_manager import BotManager
 from app.services.llm import LLMService
 from app.services.whatsapp import WhatsAppClient
@@ -29,6 +30,10 @@ from app.services.whatsapp import WhatsAppClient
 logger = logging.getLogger(__name__)
 
 WEB_DIST = Path(__file__).resolve().parent.parent / "web" / "dist"
+
+# Maximum accepted request body size. Bot/chat payloads are tiny JSON; the
+# gateway streams media directly so nothing legitimate needs to be larger.
+MAX_BODY_BYTES = 1 * 1024 * 1024
 
 _PLACEHOLDER_JID_HINTS = ("your-", "<", "example", "changeme", "placeholder")
 
@@ -126,6 +131,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    # Refuse insecure boot configurations in production. Done at app build
+    # time so misconfigurations fail loudly instead of silently exposing the
+    # admin API. See ``Settings.security_check`` for the exhaustive list.
+    settings.security_check(strict=settings.is_production, logger=logger)
+
     app = FastAPI(
         title="WhatsLang",
         description="A modular WhatsApp bot service with a sleek dashboard.",
@@ -136,18 +146,43 @@ def create_app() -> FastAPI:
         openapi_url="/api/openapi.json" if not settings.is_production else None,
     )
 
+    # CORS: ``allow_credentials=True`` is incompatible with ``allow_origins=*``
+    # per the Fetch spec — browsers refuse to send cookies in that case. We
+    # also drop credentials when the configured origin list is wildcarded so
+    # that a misconfiguration doesn't trick API clients into believing they
+    # have a credentialed session that the browser will silently strip.
+    cors_origins = settings.cors_origins
+    cors_credentialed = "*" not in cors_origins
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.cors_origins,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_origins=cors_origins,
+        allow_credentials=cors_credentialed,
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "Accept"],
+        max_age=600,
     )
 
     @app.middleware("http")
-    async def access_log(request: Request, call_next):
+    async def access_log_and_security_headers(request: Request, call_next):
         start = time.perf_counter()
         response = await call_next(request)
+        # Conservative security headers — the SPA does not load third-party
+        # scripts or framed content. ``Content-Security-Policy`` is set to a
+        # tight default; tighten or relax via a reverse proxy when needed.
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "no-referrer")
+        response.headers.setdefault(
+            "Permissions-Policy",
+            "accelerometer=(), camera=(), geolocation=(), microphone=(), payment=()",
+        )
+        # HSTS only meaningful on HTTPS; safe to send anyway because browsers
+        # ignore it on plain HTTP responses.
+        if settings.is_production:
+            response.headers.setdefault(
+                "Strict-Transport-Security",
+                "max-age=31536000; includeSubDomains",
+            )
         if not request.url.path.startswith("/assets/"):
             duration = (time.perf_counter() - start) * 1000
             logger.info(
@@ -159,6 +194,22 @@ def create_app() -> FastAPI:
             )
         return response
 
+    # ------------------------------------------------------------------
+    # Body-size guard — Starlette doesn't enforce one. Reject anything
+    # larger than ~1 MiB before it touches a router. Bot/chat payloads are
+    # tiny JSON; media never flows through this app (it streams via the
+    # gateway).
+    # ------------------------------------------------------------------
+    @app.middleware("http")
+    async def body_size_limit(request: Request, call_next):
+        cl = request.headers.get("content-length")
+        if cl and cl.isdigit() and int(cl) > MAX_BODY_BYTES:
+            return JSONResponse(
+                status_code=413,
+                content={"detail": "Request body too large"},
+            )
+        return await call_next(request)
+
     app.include_router(auth_router.router)
     app.include_router(system_router.router)
     app.include_router(chats_router.router)
@@ -166,8 +217,14 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(RuntimeError)
     async def runtime_error(_: Request, exc: RuntimeError) -> JSONResponse:
-        logger.error("Runtime error: %s", exc)
-        return JSONResponse(status_code=500, content={"detail": str(exc)})
+        # Never echo the exception message to the client: it routinely
+        # contains paths, env-var names and other internals. The full detail
+        # is logged server-side.
+        logger.error("Runtime error: %s", exc, exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={"detail": redact_error(exc)},
+        )
 
     # ----- Top-level legacy/system endpoints (no /api prefix) ------------
     @app.get("/health")
@@ -203,9 +260,14 @@ def create_app() -> FastAPI:
             # Don't shadow API routes — let them 404 naturally.
             if full_path.startswith("api") or full_path in {"health", "ready"}:
                 return JSONResponse(status_code=404, content={"detail": "Not found"})
-            target = WEB_DIST / full_path
-            if full_path and target.is_file():
-                return FileResponse(target)
+            # SECURITY: ``Path(WEB_DIST) / full_path`` would silently allow
+            # traversal via URL-encoded ``../`` segments and serve any file
+            # readable by the process. ``safe_static_path`` resolves the
+            # join and refuses anything that escapes ``WEB_DIST``.
+            if full_path:
+                resolved = safe_static_path(WEB_DIST, full_path)
+                if resolved is not None:
+                    return FileResponse(resolved)
             return FileResponse(WEB_DIST / "index.html")
     else:
         @app.get("/")

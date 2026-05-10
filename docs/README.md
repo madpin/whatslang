@@ -25,7 +25,9 @@
 6. **[deployment.md](deployment.md)** — Docker, Compose, Nixpacks,
    Railpack, bare metal, reverse proxies, healthchecks, sizing.
 7. **[api.md](api.md)** — full REST API reference with curl examples.
-8. **[troubleshooting.md](troubleshooting.md)** — when things go
+8. **[security.md](security.md)** — threat model, defences in the
+   codebase, operator checklist. Read **before** exposing the service.
+9. **[troubleshooting.md](troubleshooting.md)** — when things go
    sideways.
 
 ---
@@ -40,6 +42,7 @@
 | **…write a bot** | [bots.md](bots.md) |
 | **…look up an env var** | [configuration.md](configuration.md) |
 | **…hit the API from a script** | [api.md](api.md) |
+| **…harden it before going live** | [security.md](security.md) |
 | **…debug a not-replying bot** | [troubleshooting.md ▸ "Bots aren't replying"](troubleshooting.md#bots-arent-replying) |
 | **…understand failure modes & limits** | [architecture.md ▸ Failure modes & limits](architecture.md#failure-modes--limits) |
 

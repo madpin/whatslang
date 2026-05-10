@@ -28,10 +28,18 @@ JSON out, served under `/api/`.
   `/health`, `/api/health`, and `/api/auth/*` requires a valid
   `whatslang_session` cookie.
 - Errors use FastAPI's standard shape: `{"detail": "message"}` with the
-  appropriate 4xx/5xx status code.
+  appropriate 4xx/5xx status code. Internal exceptions are redacted in
+  production — full detail is logged server-side.
 - Timestamps are ISO 8601 strings in UTC.
+- Body size is capped at **1 MiB**; larger requests get a `413`.
+- `chat_jid` parameters must match the WhatsApp JID grammar with one of
+  the allow-listed servers (`s.whatsapp.net`, `g.us`, `c.us`,
+  `broadcast`, `newsletter`, `lid`). Anything else returns `400`.
+- `/api/auth/login` is **rate-limited** per client IP: 5 failures in a
+  60-second window trigger a 5-minute lockout (`429` with `Retry-After`).
 - All Pydantic models referenced below live in
   [`app/schemas.py`](../app/schemas.py).
+- Security model and operator checklist: [`docs/security.md`](security.md).
 
 ---
 

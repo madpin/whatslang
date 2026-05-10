@@ -9,7 +9,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.db import Database
-from app.deps import get_bots, get_db, get_whatsapp, require_auth
+from app.deps import get_bots, get_db, get_whatsapp, require_auth, valid_chat_jid_path
 from app.schemas import (
     AddChatRequest,
     BotStatus,
@@ -58,9 +58,9 @@ def all_chats(
 
 @router.get("/search", response_model=list[ChatBrief])
 def search_chats(
-    q: str = Query("", description="Substring of chat name or JID"),
+    q: str = Query("", max_length=200, description="Substring of chat name or JID"),
     limit: int = Query(30, ge=1, le=100),
-    chat_type: Optional[str] = None,
+    chat_type: Optional[str] = Query(None, max_length=20),
     db: Database = Depends(get_db),
     _: object = Depends(require_auth),
 ) -> list[ChatBrief]:
@@ -80,14 +80,14 @@ def search_chats(
 
 @router.get("", response_model=ChatListResponse)
 def list_chats(
-    page: int = 1,
+    page: int = Query(1, ge=1, le=10_000),
     per_page: int = Query(20, ge=1, le=100),
-    sort: str = "last_message_time",
-    order: str = "desc",
-    activity: Optional[str] = None,
-    bot_status: Optional[str] = None,
-    chat_type: Optional[str] = None,
-    search: Optional[str] = None,
+    sort: str = Query("last_message_time", max_length=40),
+    order: str = Query("desc", max_length=4),
+    activity: Optional[str] = Query(None, max_length=20),
+    bot_status: Optional[str] = Query(None, max_length=20),
+    chat_type: Optional[str] = Query(None, max_length=20),
+    search: Optional[str] = Query(None, max_length=200),
     db: Database = Depends(get_db),
     bots: BotManager = Depends(get_bots),
     _: object = Depends(require_auth),
@@ -239,7 +239,7 @@ def sync_chats(
 
 @router.get("/{chat_jid}", response_model=ChatWithBots)
 def get_chat(
-    chat_jid: str,
+    chat_jid: str = Depends(valid_chat_jid_path),
     db: Database = Depends(get_db),
     bots: BotManager = Depends(get_bots),
     _: object = Depends(require_auth),
@@ -254,7 +254,7 @@ def get_chat(
 
 @router.delete("/{chat_jid}", response_model=SimpleMessage)
 def delete_chat(
-    chat_jid: str,
+    chat_jid: str = Depends(valid_chat_jid_path),
     db: Database = Depends(get_db),
     bots: BotManager = Depends(get_bots),
     _: object = Depends(require_auth),
@@ -270,7 +270,7 @@ def delete_chat(
 
 @router.get("/{chat_jid}/messages")
 def chat_messages(
-    chat_jid: str,
+    chat_jid: str = Depends(valid_chat_jid_path),
     limit: int = Query(20, ge=1, le=100),
     whatsapp: WhatsAppClient = Depends(get_whatsapp),
     _: object = Depends(require_auth),
@@ -286,10 +286,9 @@ def bulk_action(
     bots: BotManager = Depends(get_bots),
     _: object = Depends(require_auth),
 ) -> SimpleMessage:
+    # ``action`` is a Literal in the schema, so Pydantic already rejects
+    # anything outside the known set with a 422.
     action = payload.action
-    if action not in {"start_bots", "stop_bots", "delete_chats"}:
-        raise HTTPException(status_code=400, detail=f"Unknown action: {action}")
-
     succeeded = 0
     for chat_jid in payload.chat_jids:
         try:

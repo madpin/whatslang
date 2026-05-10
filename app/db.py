@@ -27,10 +27,21 @@ class Database:
 
     def __init__(self, db_path: Path):
         self.db_path = Path(db_path)
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        # ``mode=0o700`` keeps the data directory readable only by the
+        # owning user. The DB stores excerpts of real WhatsApp messages
+        # plus per-chat bot configuration — both should not be world-
+        # readable on shared hosts.
+        self.db_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        # Best-effort on platforms / volumes where chmod is a no-op
+        # (e.g. some Docker bind-mounts on Windows hosts).
+        with contextlib.suppress(OSError):
+            self.db_path.parent.chmod(0o700)
         # Allow connections from worker threads (each call opens its own).
         self._lock = threading.Lock()
         self._init_schema()
+        with contextlib.suppress(OSError):
+            if self.db_path.exists():
+                self.db_path.chmod(0o600)
 
     # ------------------------------------------------------------------
     # Connection helpers

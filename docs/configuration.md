@@ -56,8 +56,11 @@ auto-detect from outgoing messages.
 | Variable | Default | Description |
 |---|---|---|
 | `DASHBOARD_USER` | `admin` | The single permitted username. |
-| `DASHBOARD_PASSWORD` | *(empty)* | The plain-text password. **Empty disables auth entirely** — handy on private networks behind another auth proxy. |
-| `SESSION_SECRET` | *(empty → auto)* | HMAC key for the `whatslang_session` cookie. If empty, a random key is generated at startup, which means **sessions are invalidated on every restart**. Set this to a long random string in production. |
+| `DASHBOARD_PASSWORD` | *(empty)* | The plain-text password. **Empty disables auth entirely**; the service refuses to start in `ENVIRONMENT=production` with this empty, and warns loudly otherwise. Always set one before exposing the service to anything beyond `localhost`. |
+| `SESSION_SECRET` | *(empty → per-process random)* | HMAC key for the `whatslang_session` cookie. Empty in production is a hard boot failure. In development a random key is generated, which means **sessions reset on every restart and don't survive a multi-instance deploy**. Generate one with `python -c 'import secrets; print(secrets.token_urlsafe(48))'`. |
+
+> See [`security.md`](security.md) for how authentication, sessions, CSRF
+> and CORS interact.
 | `SESSION_MAX_AGE_SECONDS` | `604800` (7 days) | Cookie max-age. |
 
 > Generate a strong secret:
