@@ -94,12 +94,37 @@ class Database:
                     PRIMARY KEY (message_id, bot_name)
                 );
 
+                -- Per-message-id "we observed it once" bookkeeping. Used by
+                -- the diagnostics page to count inbound traffic without
+                -- double-counting when several bots watch the same chat.
+                -- We trim rows older than 30 days at startup; the table is
+                -- meant to be tiny.
+                CREATE TABLE IF NOT EXISTS seen_messages (
+                    message_id  TEXT PRIMARY KEY,
+                    media_type  TEXT,
+                    chat_jid    TEXT,
+                    seen_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+
+                -- One row per media type. Lets the diagnostics page show
+                -- "last image / audio / video / text observed at" without
+                -- scanning the whole message log on every refresh.
+                CREATE TABLE IF NOT EXISTS inbound_observations (
+                    media_type    TEXT PRIMARY KEY,
+                    last_seen_at  TIMESTAMP NOT NULL,
+                    last_chat_jid TEXT,
+                    last_sender   TEXT,
+                    total_count   INTEGER NOT NULL DEFAULT 0
+                );
+
                 CREATE INDEX IF NOT EXISTS idx_chats_last_message_time
                     ON chats(last_message_time DESC);
                 CREATE INDEX IF NOT EXISTS idx_assignments_chat
                     ON bot_chat_assignments(chat_jid);
                 CREATE INDEX IF NOT EXISTS idx_assignments_running
                     ON bot_chat_assignments(running);
+                CREATE INDEX IF NOT EXISTS idx_seen_messages_seen_at
+                    ON seen_messages(seen_at);
                 """
             )
             # Idempotent migrations from older versions.
@@ -119,6 +144,14 @@ class Database:
                 logger.info("Migrated 'enabled' column to 'running'")
             except sqlite3.OperationalError:
                 pass
+
+            # Trim old ``seen_messages`` rows. The table only exists for
+            # cross-bot deduplication of recent observations; bounded
+            # cleanup keeps it tiny across long-running deployments.
+            with contextlib.suppress(sqlite3.OperationalError):
+                conn.execute(
+                    "DELETE FROM seen_messages WHERE seen_at < datetime('now','-30 days')"
+                )
 
         logger.info("Database ready at %s", self.db_path)
 
@@ -384,3 +417,111 @@ class Database:
                 (bot_name,),
             ).fetchall()
             return [r[0] for r in rows]
+
+    # ==================================================================
+    # Inbound observations (diagnostics)
+    # ==================================================================
+    # Canonical media types we track for diagnostics. ``other`` is the
+    # catch-all for anything we couldn't classify (locations, contacts…).
+    INBOUND_MEDIA_TYPES: tuple[str, ...] = (
+        "text",
+        "image",
+        "audio",
+        "video",
+        "document",
+        "sticker",
+        "other",
+    )
+
+    def observe_inbound(
+        self,
+        message_id: str,
+        media_type: str,
+        chat_jid: Optional[str] = None,
+        sender: Optional[str] = None,
+        occurred_at: Optional[str] = None,
+    ) -> bool:
+        """Record one inbound message observation.
+
+        Returns ``True`` when this is the first time we've seen this
+        ``message_id`` (i.e. the per-type counter was bumped). Subsequent
+        observations of the same id are ignored, so chats with several
+        bots don't inflate the counters.
+
+        ``last_seen_at`` is monotonic per type — a stale (older) timestamp
+        will not overwrite a fresher one.
+        """
+        if not message_id:
+            return False
+        media_type = media_type or "other"
+        if media_type not in self.INBOUND_MEDIA_TYPES:
+            media_type = "other"
+        when = occurred_at or _utc_iso()
+
+        with self._connect() as conn:
+            cur = conn.execute(
+                """
+                INSERT OR IGNORE INTO seen_messages
+                    (message_id, media_type, chat_jid, seen_at)
+                VALUES (?, ?, ?, ?)
+                """,
+                (message_id, media_type, chat_jid, when),
+            )
+            if cur.rowcount == 0:
+                return False  # already counted
+            conn.execute(
+                """
+                INSERT INTO inbound_observations
+                    (media_type, last_seen_at, last_chat_jid, last_sender, total_count)
+                VALUES (?, ?, ?, ?, 1)
+                ON CONFLICT(media_type) DO UPDATE SET
+                    total_count   = inbound_observations.total_count + 1,
+                    last_seen_at  = CASE
+                        WHEN excluded.last_seen_at > inbound_observations.last_seen_at
+                        THEN excluded.last_seen_at
+                        ELSE inbound_observations.last_seen_at
+                    END,
+                    last_chat_jid = CASE
+                        WHEN excluded.last_seen_at > inbound_observations.last_seen_at
+                        THEN excluded.last_chat_jid
+                        ELSE inbound_observations.last_chat_jid
+                    END,
+                    last_sender   = CASE
+                        WHEN excluded.last_seen_at > inbound_observations.last_seen_at
+                        THEN excluded.last_sender
+                        ELSE inbound_observations.last_sender
+                    END
+                """,
+                (media_type, when, chat_jid, sender),
+            )
+        return True
+
+    def list_inbound_observations(self) -> list[dict[str, Any]]:
+        """Return one row per known media type, including unseen ones.
+
+        Unseen types are returned with ``last_seen_at=None`` and
+        ``total_count=0`` so the UI can render them as "never observed"
+        instead of hiding the row.
+        """
+        with self._connect() as conn:
+            rows = {
+                row["media_type"]: dict(row)
+                for row in conn.execute(
+                    "SELECT * FROM inbound_observations"
+                ).fetchall()
+            }
+        out: list[dict[str, Any]] = []
+        for kind in self.INBOUND_MEDIA_TYPES:
+            if kind in rows:
+                out.append(rows[kind])
+            else:
+                out.append(
+                    {
+                        "media_type": kind,
+                        "last_seen_at": None,
+                        "last_chat_jid": None,
+                        "last_sender": None,
+                        "total_count": 0,
+                    }
+                )
+        return out

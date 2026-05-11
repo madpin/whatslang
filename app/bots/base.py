@@ -11,6 +11,7 @@ import enum
 import logging
 import time
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 from app.db import Database
@@ -18,6 +19,44 @@ from app.services.llm import LLMService
 from app.services.whatsapp import WhatsAppClient
 
 logger = logging.getLogger(__name__)
+
+
+def _ts_to_iso(value: Any) -> Optional[str]:
+    """Best-effort convert a gateway timestamp to ISO 8601 UTC.
+
+    The WhatsApp gateway exposes timestamps in several shapes depending
+    on the endpoint and version: epoch seconds (int / float / str), ISO
+    strings, or RFC3339 with ``Z``. Return ``None`` on anything we can't
+    parse so the caller falls back to "now" semantics.
+    """
+    if value is None or value == "":
+        return None
+    if isinstance(value, (int, float)):
+        try:
+            return datetime.fromtimestamp(float(value), tz=timezone.utc).isoformat(
+                timespec="seconds"
+            )
+        except (OSError, OverflowError, ValueError):
+            return None
+    if isinstance(value, str):
+        s = value.strip()
+        # Pure-numeric strings → epoch seconds.
+        if s.replace(".", "", 1).isdigit():
+            try:
+                return datetime.fromtimestamp(float(s), tz=timezone.utc).isoformat(
+                    timespec="seconds"
+                )
+            except (OSError, OverflowError, ValueError):
+                return None
+        # ISO-ish strings (Z suffix is not understood by fromisoformat
+        # before Python 3.11).
+        try:
+            return datetime.fromisoformat(s.replace("Z", "+00:00")).isoformat(
+                timespec="seconds"
+            )
+        except ValueError:
+            return s
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -94,12 +133,34 @@ def get_registry() -> dict[str, BotSpec]:
 # Helpers
 # ---------------------------------------------------------------------------
 def _detect_media_type(message: dict[str, Any]) -> Optional[str]:
-    """Return 'image' | 'audio' | 'video' if the message is media."""
+    """Return ``'image' | 'audio' | 'video'`` if the message is media that
+    a bot can act on. Documents / stickers / other types intentionally
+    return ``None`` so the runner falls through to text handling.
+    """
+    return _classify_for_bot(_classify_message(message))
+
+
+def _classify_message(message: dict[str, Any]) -> str:
+    """Coarse-classify any inbound message into a single string type.
+
+    Used both by the bot runner (which only acts on a subset) and by
+    the diagnostics tracker (which records *every* observed message
+    regardless of whether a bot would act on it).
+
+    Possible return values: ``text``, ``image``, ``audio``, ``video``,
+    ``document``, ``sticker``, ``other``.
+    """
     if mt := message.get("media_type"):
-        return _normalize_media(str(mt))
+        kind = _normalize_media(str(mt))
+        if kind:
+            return kind
     t = message.get("type")
-    if t and t not in ("text", "chat", None):
-        return _normalize_media(str(t))
+    if isinstance(t, str):
+        kind = _normalize_media(t)
+        if kind:
+            return kind
+        if t.lower() in ("text", "chat"):
+            return "text"
     nested = message.get("message")
     if isinstance(nested, dict):
         if "imageMessage" in nested:
@@ -108,6 +169,12 @@ def _detect_media_type(message: dict[str, Any]) -> Optional[str]:
             return "audio"
         if "videoMessage" in nested:
             return "video"
+        if "documentMessage" in nested:
+            return "document"
+        if "stickerMessage" in nested:
+            return "sticker"
+        if "conversation" in nested or "extendedTextMessage" in nested:
+            return "text"
     mime = message.get("mimetype") or ""
     if mime.startswith("image/"):
         return "image"
@@ -115,17 +182,32 @@ def _detect_media_type(message: dict[str, Any]) -> Optional[str]:
         return "audio"
     if mime.startswith("video/"):
         return "video"
+    if mime.startswith("application/"):
+        return "document"
+    if message.get("content"):
+        return "text"
+    return "other"
+
+
+def _classify_for_bot(kind: str) -> Optional[str]:
+    """Reduce the diagnostic classification to the subset the bot acts on."""
+    if kind in ("image", "audio", "video"):
+        return kind
     return None
 
 
 def _normalize_media(value: str) -> Optional[str]:
     v = value.lower()
-    if "image" in v:
+    if "image" in v or "photo" in v:
         return "image"
     if "video" in v:
         return "video"
     if any(w in v for w in ("audio", "voice", "ptt")):
         return "audio"
+    if "document" in v or "file" in v:
+        return "document"
+    if "sticker" in v:
+        return "sticker"
     return None
 
 
@@ -188,6 +270,14 @@ class BotRunner:
         if not messages:
             return
 
+        # Always record diagnostics observations — even on the first run
+        # and even for messages a bot would skip. This is what powers the
+        # "last image / audio / video / text observed at" panel; without
+        # it, you couldn't tell whether silence is "no traffic" or "the
+        # gateway / database broke".
+        for msg in messages:
+            self._observe(msg)
+
         if self._first_run:
             for msg in messages:
                 mid = msg.get("id")
@@ -205,6 +295,34 @@ class BotRunner:
             if self._should_process(msg):
                 self._handle(msg)
                 time.sleep(0.5)
+
+    def _observe(self, message: dict[str, Any]) -> None:
+        """Best-effort: log every distinct message-id into ``inbound_observations``.
+
+        Failures are swallowed — a broken DB write must never stop the
+        bot from doing its real job.
+        """
+        mid = message.get("id")
+        if not mid:
+            return
+        try:
+            kind = _classify_message(message)
+            sender = (
+                message.get("sender_jid")
+                or message.get("from")
+                or message.get("sender")
+                or message.get("push_name")
+            )
+            ts = _ts_to_iso(message.get("timestamp") or message.get("time"))
+            self.db.observe_inbound(
+                str(mid),
+                media_type=kind,
+                chat_jid=self.chat_jid,
+                sender=str(sender) if sender else None,
+                occurred_at=ts,
+            )
+        except Exception:  # pragma: no cover - defensive
+            self._log.debug("observe_inbound failed", exc_info=True)
 
     def _should_process(self, message: dict[str, Any]) -> bool:
         mid = message.get("id")

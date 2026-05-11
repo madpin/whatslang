@@ -145,8 +145,38 @@ class _FakeWhatsApp:
 
 
 class _FakeLLM:
+    """Minimal stand-in for ``LLMService`` — just enough surface for the
+    tests that exercise ``/api/diagnostics`` without spending tokens."""
+
     def __init__(self, *_: Any, **__: Any) -> None:
-        pass
+        self.model = "stub-text"
+        self.vision_model = "stub-vision"
+        self.audio_model = "stub-audio"
+
+    def activity_snapshot(self) -> list[dict[str, Any]]:
+        return [
+            {
+                "surface": kind,
+                "model": getattr(
+                    self,
+                    {
+                        "text": "model",
+                        "vision": "vision_model",
+                        "audio": "audio_model",
+                        "video": "audio_model",
+                    }[kind],
+                ),
+                "call_count": 0,
+                "success_count": 0,
+                "error_count": 0,
+                "last_call_at": None,
+                "last_success_at": None,
+                "last_error_at": None,
+                "last_error_message": None,
+                "last_latency_ms": None,
+            }
+            for kind in ("text", "vision", "audio", "video")
+        ]
 
 
 @pytest.fixture

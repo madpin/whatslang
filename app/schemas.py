@@ -191,12 +191,41 @@ class GatewayDiagnostics(BaseModel):
     error_count: int = 0
 
 
+class LlmSurfaceActivity(BaseModel):
+    """Per-surface (text / vision / audio / video) live activity."""
+
+    surface: Literal["text", "vision", "audio", "video"]
+    model: Optional[str] = None
+    call_count: int = 0
+    success_count: int = 0
+    error_count: int = 0
+    last_call_at: Optional[str] = None
+    last_success_at: Optional[str] = None
+    last_error_at: Optional[str] = None
+    last_error_message: Optional[str] = None
+    last_latency_ms: Optional[int] = None
+
+
 class LlmDiagnostics(BaseModel):
     base_url: Optional[str] = None
     text_model: str
     vision_model: str
     audio_model: str
     api_key_set: bool
+    surfaces: list[LlmSurfaceActivity] = Field(default_factory=list)
+
+
+class InboundObservation(BaseModel):
+    """Last observed inbound message of a given media type."""
+
+    media_type: Literal[
+        "text", "image", "audio", "video", "document", "sticker", "other"
+    ]
+    last_seen_at: Optional[str] = None
+    last_chat_jid: Optional[str] = None
+    last_chat_name: Optional[str] = None
+    last_sender: Optional[str] = None
+    total_count: int = 0
 
 
 class DatabaseDiagnostics(BaseModel):
@@ -228,4 +257,5 @@ class Diagnostics(BaseModel):
     llm: LlmDiagnostics
     database: DatabaseDiagnostics
     bots: BotsDiagnostics
+    inbound: list[InboundObservation] = Field(default_factory=list)
     recent_errors: list[GatewayErrorEntry] = Field(default_factory=list)

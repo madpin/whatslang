@@ -81,3 +81,33 @@ export function debounce<T extends (...args: unknown[]) => void>(fn: T, delay = 
     t = setTimeout(() => fn(...args), delay);
   }) as T;
 }
+
+/** Categorise a timestamp's age into a tone for diagnostic badges.
+ *
+ * - ``never`` — no value yet; UI typically renders this in grey
+ * - ``fresh`` — within the last 5 minutes
+ * - ``recent`` — within the last hour
+ * - ``stale`` — within the last day
+ * - ``cold`` — older than a day
+ */
+export type Staleness = 'never' | 'fresh' | 'recent' | 'stale' | 'cold';
+
+export function staleness(iso: string | null | undefined): Staleness {
+  if (!iso) return 'never';
+  const ts = new Date(iso).getTime();
+  if (Number.isNaN(ts)) return 'never';
+  const diffSec = (Date.now() - ts) / 1000;
+  if (diffSec < 5 * 60) return 'fresh';
+  if (diffSec < 60 * 60) return 'recent';
+  if (diffSec < 24 * 60 * 60) return 'stale';
+  return 'cold';
+}
+
+/** Map a Staleness value to a Badge tone. */
+export const STALENESS_TONE: Record<Staleness, 'gray' | 'green' | 'blue' | 'amber' | 'red'> = {
+  never: 'gray',
+  fresh: 'green',
+  recent: 'blue',
+  stale: 'amber',
+  cold: 'red',
+};

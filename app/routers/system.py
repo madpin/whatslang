@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 
 from app import __version__
 from app.config import Settings
@@ -18,11 +18,14 @@ from app.schemas import (
     GatewayDiagnostics,
     GatewayErrorEntry,
     Health,
+    InboundObservation,
     LlmDiagnostics,
+    LlmSurfaceActivity,
     Stats,
     SystemInfo,
 )
 from app.services.bot_manager import BotManager
+from app.services.llm import LLMService
 from app.services.whatsapp import WhatsAppClient
 
 router = APIRouter(tags=["system"])
@@ -79,6 +82,7 @@ def stats(
 
 @router.get("/api/diagnostics", response_model=Diagnostics)
 def diagnostics(
+    request: Request,
     settings: Settings = Depends(settings_dep),
     db: Database = Depends(get_db),
     whatsapp: WhatsAppClient = Depends(get_whatsapp),
@@ -102,14 +106,45 @@ def diagnostics(
         error_count=whatsapp.error_count,
     )
 
-    # LLM diagnostics — no live API call (avoid spending credits each refresh).
+    # LLM diagnostics — no live API call (avoid spending credits each
+    # refresh). Per-surface activity comes from the in-memory tracker on
+    # the ``LLMService`` instance.
+    llm_service: LLMService | None = getattr(request.app.state, "llm", None)
+    surfaces = (
+        [LlmSurfaceActivity(**row) for row in llm_service.activity_snapshot()]
+        if llm_service is not None
+        else []
+    )
     llm = LlmDiagnostics(
         base_url=settings.openai_base_url,
         text_model=settings.openai_model,
         vision_model=settings.openai_vision_model or settings.openai_model,
         audio_model=settings.openai_audio_model,
         api_key_set=bool(settings.openai_api_key),
+        surfaces=surfaces,
     )
+
+    # Inbound observations. Resolve a friendly chat name from the
+    # ``chats`` table so the operator can recognise the conversation
+    # without decoding the JID.
+    obs_rows = db.list_inbound_observations()
+    name_lookup: dict[str, str] = {}
+    needed = {row["last_chat_jid"] for row in obs_rows if row.get("last_chat_jid")}
+    for jid in needed:
+        chat = db.get_chat(jid)
+        if chat:
+            name_lookup[jid] = chat.get("chat_name") or jid
+    inbound = [
+        InboundObservation(
+            media_type=row["media_type"],
+            last_seen_at=row["last_seen_at"],
+            last_chat_jid=row["last_chat_jid"],
+            last_chat_name=name_lookup.get(row.get("last_chat_jid") or ""),
+            last_sender=row["last_sender"],
+            total_count=int(row["total_count"]),
+        )
+        for row in obs_rows
+    ]
 
     # Database stats — counts come from the live DB connection.
     db_path = str(settings.db_path)
@@ -159,5 +194,6 @@ def diagnostics(
         llm=llm,
         database=database,
         bots=bots_d,
+        inbound=inbound,
         recent_errors=recent,
     )

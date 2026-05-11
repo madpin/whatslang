@@ -112,12 +112,46 @@ export interface GatewayDiagnostics {
   error_count: number;
 }
 
+export type LlmSurface = 'text' | 'vision' | 'audio' | 'video';
+
+export interface LlmSurfaceActivity {
+  surface: LlmSurface;
+  model: string | null;
+  call_count: number;
+  success_count: number;
+  error_count: number;
+  last_call_at: string | null;
+  last_success_at: string | null;
+  last_error_at: string | null;
+  last_error_message: string | null;
+  last_latency_ms: number | null;
+}
+
 export interface LlmDiagnostics {
   base_url: string | null;
   text_model: string;
   vision_model: string;
   audio_model: string;
   api_key_set: boolean;
+  surfaces: LlmSurfaceActivity[];
+}
+
+export type InboundMediaType =
+  | 'text'
+  | 'image'
+  | 'audio'
+  | 'video'
+  | 'document'
+  | 'sticker'
+  | 'other';
+
+export interface InboundObservation {
+  media_type: InboundMediaType;
+  last_seen_at: string | null;
+  last_chat_jid: string | null;
+  last_chat_name: string | null;
+  last_sender: string | null;
+  total_count: number;
 }
 
 export interface DatabaseDiagnostics {
@@ -149,5 +183,6 @@ export interface Diagnostics {
   llm: LlmDiagnostics;
   database: DatabaseDiagnostics;
   bots: BotsDiagnostics;
+  inbound: InboundObservation[];
   recent_errors: GatewayErrorEntry[];
 }

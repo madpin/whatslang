@@ -2,23 +2,47 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Activity,
   AlertTriangle,
-  Bot,
   CheckCircle2,
   Database,
+  Eye,
+  FileText,
+  Image as ImageIcon,
+  Mic,
+  MessageSquare,
+  Music,
+  Package,
   RefreshCw,
   Server,
   ServerCrash,
+  Sticker,
+  Type,
+  Video,
   Wifi,
   WifiOff,
+  XCircle,
 } from 'lucide-react';
 
 import { System } from '@/api/endpoints';
-import type { Diagnostics } from '@/api/types';
+import type {
+  Diagnostics,
+  InboundMediaType,
+  InboundObservation,
+  LlmSurface,
+  LlmSurfaceActivity,
+} from '@/api/types';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/Card';
 import { PageHeader } from '@/components/PageHeader';
-import { formatBytes, formatRelative, pluralize } from '@/lib/utils';
+import {
+  STALENESS_TONE,
+  chatDisplayName,
+  formatBytes,
+  formatRelative,
+  pluralize,
+  shortenJid,
+  staleness,
+} from '@/lib/utils';
 
 export function DiagnosticsPage() {
   const qc = useQueryClient();
@@ -49,12 +73,16 @@ export function DiagnosticsPage() {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <GatewayCard data={data} loading={diagQ.isLoading} />
-        <LlmCard data={data} loading={diagQ.isLoading} />
         <DatabaseCard data={data} loading={diagQ.isLoading} />
-        <BotsCard data={data} loading={diagQ.isLoading} />
       </div>
 
-      <div className="mt-4">
+      <div className="mt-4 grid grid-cols-1 gap-4">
+        <ModelActivityCard data={data} loading={diagQ.isLoading} />
+        <InboundTrafficCard data={data} loading={diagQ.isLoading} />
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <BotsCard data={data} loading={diagQ.isLoading} />
         <RecentErrorsCard data={data} loading={diagQ.isLoading} />
       </div>
     </>
@@ -225,47 +253,246 @@ function GatewayCard({ data, loading }: { data?: Diagnostics; loading: boolean }
   );
 }
 
-function LlmCard({ data, loading }: { data?: Diagnostics; loading: boolean }) {
+const SURFACE_LABEL: Record<LlmSurface, string> = {
+  text: 'Text',
+  vision: 'Vision',
+  audio: 'Audio (Whisper)',
+  video: 'Video → Audio',
+};
+
+const SURFACE_ICON: Record<LlmSurface, React.ReactNode> = {
+  text: <Type size={14} />,
+  vision: <Eye size={14} />,
+  audio: <Mic size={14} />,
+  video: <Video size={14} />,
+};
+
+function ModelActivityCard({
+  data,
+  loading,
+}: {
+  data?: Diagnostics;
+  loading: boolean;
+}) {
   const llm = data?.llm;
+  const surfaces = llm?.surfaces ?? [];
+  const totalCalls = surfaces.reduce((acc, s) => acc + s.call_count, 0);
+  const totalErrors = surfaces.reduce((acc, s) => acc + s.error_count, 0);
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle>LLM service</CardTitle>
+        <CardTitle>Model activity</CardTitle>
         {loading ? (
           <Badge tone="gray">…</Badge>
-        ) : llm?.api_key_set ? (
-          <Badge tone="green" dot>
-            Key set
-          </Badge>
-        ) : (
+        ) : !llm?.api_key_set ? (
           <Badge tone="red" dot>
             No API key
           </Badge>
+        ) : (
+          <span className="flex items-center gap-2">
+            <Badge tone="gray">
+              {pluralize(totalCalls, 'call')}
+            </Badge>
+            <Badge tone={totalErrors > 0 ? 'amber' : 'green'} dot>
+              {pluralize(totalErrors, 'error')}
+            </Badge>
+          </span>
         )}
       </CardHeader>
-      <CardBody className="space-y-3">
-        <Row
-          icon={<Server size={14} />}
-          label="Endpoint"
-          value={<code className="text-xs">{llm?.base_url ?? '—'}</code>}
-        />
-        <Row
-          icon={<Bot size={14} />}
-          label="Text model"
-          value={<code className="text-xs">{llm?.text_model ?? '—'}</code>}
-        />
-        <Row
-          icon={<Bot size={14} />}
-          label="Vision model"
-          value={<code className="text-xs">{llm?.vision_model ?? '—'}</code>}
-        />
-        <Row
-          icon={<Bot size={14} />}
-          label="Audio model"
-          value={<code className="text-xs">{llm?.audio_model ?? '—'}</code>}
-        />
+      <CardBody className="space-y-2 px-0 py-0">
+        {!llm ? (
+          <p className="px-5 py-4 text-sm text-zinc-500">Loading…</p>
+        ) : (
+          <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
+            {surfaces.map((s) => (
+              <SurfaceRow key={s.surface} surface={s} />
+            ))}
+            {surfaces.length === 0 ? (
+              <li className="px-5 py-4 text-sm text-zinc-500">
+                No model calls yet. Send a message to a chat with a bot enabled.
+              </li>
+            ) : null}
+          </ul>
+        )}
       </CardBody>
     </Card>
+  );
+}
+
+function SurfaceRow({ surface }: { surface: LlmSurfaceActivity }) {
+  const sLast = staleness(surface.last_success_at);
+  const successHasHappened = surface.success_count > 0;
+  const errorRate =
+    surface.call_count > 0
+      ? Math.round((surface.error_count / surface.call_count) * 100)
+      : 0;
+
+  return (
+    <li className="grid grid-cols-12 gap-3 px-5 py-3 text-sm">
+      <div className="col-span-12 flex items-center gap-2 sm:col-span-3">
+        <span className="text-zinc-500">{SURFACE_ICON[surface.surface]}</span>
+        <span className="font-medium text-zinc-800 dark:text-zinc-100">
+          {SURFACE_LABEL[surface.surface]}
+        </span>
+        {surface.model ? (
+          <code className="ml-1 truncate text-xs text-zinc-500">{surface.model}</code>
+        ) : null}
+      </div>
+
+      <div className="col-span-12 flex items-center gap-2 sm:col-span-3">
+        <Badge tone={successHasHappened ? STALENESS_TONE[sLast] : 'gray'} dot>
+          {successHasHappened ? `last ok ${formatRelative(surface.last_success_at)}` : 'never served'}
+        </Badge>
+      </div>
+
+      <div className="col-span-12 sm:col-span-3">
+        {surface.last_error_at ? (
+          <span
+            className="inline-flex max-w-full items-center gap-1.5 truncate text-xs text-red-600 dark:text-red-400"
+            title={surface.last_error_message ?? undefined}
+          >
+            <XCircle size={12} className="shrink-0" />
+            <span className="truncate">
+              error {formatRelative(surface.last_error_at)}
+            </span>
+          </span>
+        ) : (
+          <span className="text-xs text-zinc-400">no errors</span>
+        )}
+      </div>
+
+      <div className="col-span-12 flex items-center justify-end gap-3 text-xs sm:col-span-3">
+        <span className="tabular-nums text-zinc-700 dark:text-zinc-200">
+          {surface.success_count} ok
+        </span>
+        <span className="text-zinc-400">/</span>
+        <span
+          className={
+            surface.error_count > 0
+              ? 'tabular-nums text-red-500'
+              : 'tabular-nums text-zinc-400'
+          }
+        >
+          {surface.error_count} err
+        </span>
+        {errorRate > 0 ? (
+          <Badge tone={errorRate > 20 ? 'red' : 'amber'}>{errorRate}%</Badge>
+        ) : null}
+        {surface.last_latency_ms != null ? (
+          <span className="text-zinc-400">{surface.last_latency_ms}ms</span>
+        ) : null}
+      </div>
+    </li>
+  );
+}
+
+const MEDIA_LABEL: Record<InboundMediaType, string> = {
+  text: 'Text',
+  image: 'Image',
+  audio: 'Audio / Voice note',
+  video: 'Video',
+  document: 'Document',
+  sticker: 'Sticker',
+  other: 'Other',
+};
+
+const MEDIA_ICON: Record<InboundMediaType, React.ReactNode> = {
+  text: <MessageSquare size={14} />,
+  image: <ImageIcon size={14} />,
+  audio: <Music size={14} />,
+  video: <Video size={14} />,
+  document: <FileText size={14} />,
+  sticker: <Sticker size={14} />,
+  other: <Package size={14} />,
+};
+
+function InboundTrafficCard({
+  data,
+  loading,
+}: {
+  data?: Diagnostics;
+  loading: boolean;
+}) {
+  const inbound = data?.inbound ?? [];
+  const totalSeen = inbound.reduce((acc, i) => acc + i.total_count, 0);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Inbound traffic by type</CardTitle>
+        {loading ? (
+          <Badge tone="gray">…</Badge>
+        ) : (
+          <Badge tone={totalSeen > 0 ? 'brand' : 'gray'}>
+            {pluralize(totalSeen, 'message')} observed
+          </Badge>
+        )}
+      </CardHeader>
+      <CardBody className="px-0 py-0">
+        {!inbound.length ? (
+          <p className="px-5 py-4 text-sm text-zinc-500">Loading…</p>
+        ) : (
+          <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
+            {inbound.map((row) => (
+              <InboundRow key={row.media_type} obs={row} />
+            ))}
+          </ul>
+        )}
+        <p className="border-t border-zinc-100 px-5 py-3 text-xs text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
+          Counts only include messages from chats with at least one bot
+          enabled (those are the chats we actively poll). If a type you
+          know just arrived isn&apos;t showing as <em>fresh</em>, the
+          gateway, the bot poll loop, or the database write is stuck.
+        </p>
+      </CardBody>
+    </Card>
+  );
+}
+
+function InboundRow({ obs }: { obs: InboundObservation }) {
+  const tone = obs.last_seen_at ? STALENESS_TONE[staleness(obs.last_seen_at)] : 'gray';
+  const chatLabel = obs.last_chat_jid
+    ? chatDisplayName({
+        chat_jid: obs.last_chat_jid,
+        chat_name: obs.last_chat_name,
+      })
+    : null;
+
+  return (
+    <li className="grid grid-cols-12 gap-3 px-5 py-3 text-sm">
+      <div className="col-span-12 flex items-center gap-2 sm:col-span-3">
+        <span className="text-zinc-500">{MEDIA_ICON[obs.media_type]}</span>
+        <span className="font-medium text-zinc-800 dark:text-zinc-100">
+          {MEDIA_LABEL[obs.media_type]}
+        </span>
+      </div>
+
+      <div className="col-span-12 flex items-center gap-2 sm:col-span-3">
+        <Badge tone={tone} dot>
+          {obs.last_seen_at ? formatRelative(obs.last_seen_at) : 'never seen'}
+        </Badge>
+      </div>
+
+      <div className="col-span-12 truncate text-xs text-zinc-600 dark:text-zinc-300 sm:col-span-4">
+        {chatLabel ? (
+          <span title={obs.last_chat_jid ?? undefined}>
+            from <span className="font-medium">{chatLabel}</span>
+            {obs.last_sender ? (
+              <span className="ml-1 text-zinc-400">
+                ({shortenJid(obs.last_sender, 16)})
+              </span>
+            ) : null}
+          </span>
+        ) : (
+          <span className="text-zinc-400">—</span>
+        )}
+      </div>
+
+      <div className="col-span-12 text-right text-xs tabular-nums text-zinc-600 dark:text-zinc-400 sm:col-span-2">
+        {obs.total_count} total
+      </div>
+    </li>
   );
 }
 
