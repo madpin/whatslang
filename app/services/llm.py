@@ -216,7 +216,12 @@ class LLMService:
     # ------------------------------------------------------------------
     # Vision
     # ------------------------------------------------------------------
-    def call_with_image(self, prompt: str, image_bytes: bytes) -> Optional[str]:
+    def call_with_image(
+        self,
+        prompt: str,
+        image_bytes: bytes,
+        user_text: Optional[str] = None,
+    ) -> Optional[str]:
         mime = _detect_image_mime(image_bytes)
         if not mime:
             self._record_call(
@@ -228,19 +233,17 @@ class LLMService:
             logger.error("Unsupported image format")
             return None
         data_url = f"data:{mime};base64,{base64.b64encode(image_bytes).decode()}"
+        content: list[dict[str, Any]] = [
+            {"type": "text", "text": prompt},
+            {"type": "image_url", "image_url": {"url": data_url}},
+        ]
+        if user_text:
+            content.append({"type": "text", "text": user_text})
         t0 = time.perf_counter()
         try:
             r = self.client.chat.completions.create(
                 model=self.vision_model,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": prompt},
-                            {"type": "image_url", "image_url": {"url": data_url}},
-                        ],
-                    }
-                ],
+                messages=[{"role": "user", "content": content}],
             )
             content = r.choices[0].message.content
             self._record_call(

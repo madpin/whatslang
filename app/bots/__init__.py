@@ -40,11 +40,15 @@ register(
         image_prompt=(
             "Look at the image and find any text, signs, labels, captions or "
             "writing.\n"
-            "If there IS text:\n"
+            "If there IS text in the image:\n"
             "  📝 Original Text: <verbatim>\n"
             "  🌍 Translation: <translation to the OTHER of EN/PT>\n"
-            "If there is NO text:\n"
-            "  📷 Image contains: <one-sentence description>"
+            "If there is NO text in the image:\n"
+            "  📷 Image contains: <one-sentence description>\n"
+            "If a caption was sent alongside the image, ALSO add (after the "
+            "image section):\n"
+            "  ✉️ Caption: <verbatim caption>\n"
+            "  🌍 Caption translation: <translation to the OTHER of EN/PT>"
         ),
         media_mode=MediaMode.TRANSCRIBE_AND_TRANSLATE,
         translation_target_prompt=(
@@ -76,15 +80,20 @@ register(
         ),
         image_prompt=(
             "Find any text in the image, then apply these rules:\n"
-            "If the text is English:\n"
+            "If the text in the image is English:\n"
             "  📝 Original Text: <verbatim>\n"
             "  🇧🇷 Portuguese: <pt-BR>\n"
             "  🇬🇷 Greek: <el>\n"
-            "If the text is in any other language:\n"
+            "If the text in the image is in any other language:\n"
             "  📝 Original Text: <verbatim>\n"
             "  🌍 English: <english translation>\n"
-            "If there is NO text:\n"
-            "  📷 Image contains: <description>"
+            "If there is NO text in the image:\n"
+            "  📷 Image contains: <description>\n"
+            "If a caption was sent alongside the image, ALSO add (after the "
+            "image section), applying the same language rules to the caption:\n"
+            "  ✉️ Caption: <verbatim>\n"
+            "  If caption is English → 🇧🇷 Portuguese: <pt-BR> / 🇬🇷 Greek: <el>\n"
+            "  Otherwise → 🌍 English: <english translation>"
         ),
         media_mode=MediaMode.TRANSCRIBE_AND_TRANSLATE,
         translation_target_prompt=(
@@ -139,7 +148,10 @@ register(
             "rough macros (carbs, protein, fat, fiber) and give one short, "
             "kind tip.\n"
             "If NOT food: briefly note what you see and one wellness point "
-            "(movement, rest, hydration, habits)."
+            "(movement, rest, hydration, habits).\n"
+            "If a caption was sent alongside the image, also respond to it as "
+            "the same health coach in the user's language, keeping the reply "
+            "concise."
         ),
         media_mode=MediaMode.TRANSCRIBE_AND_REPLY,
     )

@@ -368,12 +368,13 @@ class BotRunner:
 
     def _produce_response(self, message: dict[str, Any], text: str) -> Optional[str]:
         media = _detect_media_type(message)
+        caption = (text or "").strip()
         if media == "image" and self.spec.supports_image:
-            return self._handle_image(message)
+            return self._handle_image(message, caption)
         if media == "audio" and self.spec.supports_audio:
-            return self._handle_audio(message)
+            return self._handle_audio(message, caption)
         if media == "video" and self.spec.supports_video:
-            return self._handle_video(message)
+            return self._handle_video(message, caption)
         if text:
             history = self._maybe_history(message)
             return self._reply_to_text(text, history)
@@ -417,23 +418,35 @@ class BotRunner:
         return history
 
     # --- image ----------------------------------------------------------
-    def _handle_image(self, message: dict[str, Any]) -> Optional[str]:
+    def _handle_image(self, message: dict[str, Any], caption: str = "") -> Optional[str]:
         mid = message.get("id") or ""
         data = self.whatsapp.download_image(mid, self.chat_jid)
         if not data:
             return "❌ Couldn't download the image."
-        result = self.llm.call_with_image(self.spec.image_prompt or "Describe this image.", data)
+        prompt = self.spec.image_prompt or "Describe this image."
+        user_text: Optional[str] = None
+        if caption:
+            user_text = (
+                "A caption was sent together with this image:\n"
+                f'"""\n{caption}\n"""\n'
+                "Treat the caption as additional source text: apply the same rules "
+                "to it that you apply to text found inside the image, and include "
+                "both the image text/description AND the caption (with its "
+                "translation, if your role is translation) in your reply under "
+                "clearly labelled sections."
+            )
+        result = self.llm.call_with_image(prompt, data, user_text=user_text)
         return result or "❌ Couldn't analyse the image, please try again."
 
     # --- audio / video --------------------------------------------------
-    def _handle_audio(self, message: dict[str, Any]) -> Optional[str]:
+    def _handle_audio(self, message: dict[str, Any], caption: str = "") -> Optional[str]:
         mid = message.get("id") or ""
         data = self.whatsapp.download_audio(mid, self.chat_jid)
         if not data:
             return "❌ Couldn't download the voice message."
-        return self._transcribe_and_reply(data, prefix="🎤 Transcription")
+        return self._transcribe_and_reply(data, prefix="🎤 Transcription", caption=caption)
 
-    def _handle_video(self, message: dict[str, Any]) -> Optional[str]:
+    def _handle_video(self, message: dict[str, Any], caption: str = "") -> Optional[str]:
         mid = message.get("id") or ""
         video = self.whatsapp.download_video(mid, self.chat_jid)
         if not video:
@@ -445,23 +458,44 @@ class BotRunner:
             return "❌ This video has no audio track, or I couldn't extract it."
         if len(audio) > 25 * 1024 * 1024:
             return "❌ The video's audio is too long for transcription. Please send a shorter clip."
-        return self._transcribe_and_reply(audio, prefix="🎬 Video transcription")
+        return self._transcribe_and_reply(audio, prefix="🎬 Video transcription", caption=caption)
 
-    def _transcribe_and_reply(self, audio_bytes: bytes, *, prefix: str) -> Optional[str]:
+    def _transcribe_and_reply(
+        self, audio_bytes: bytes, *, prefix: str, caption: str = ""
+    ) -> Optional[str]:
         transcription = self.llm.transcribe_audio(audio_bytes)
         if not transcription:
             return "❌ Couldn't transcribe the audio. Please try again."
         if self.spec.media_mode is MediaMode.TRANSCRIBE_AND_TRANSLATE:
             target_prompt = self.spec.translation_target_prompt or self.spec.text_system_prompt
             translation = self.llm.call(target_prompt, transcription)
-            if not translation:
-                return f"{prefix}:\n{transcription}\n\n⚠️ Translation unavailable right now."
-            return f"{prefix}:\n{transcription}\n\n🌍 Translation:\n{translation}"
-        # TRANSCRIBE_AND_REPLY: feed transcript through the text prompt.
-        reply = self.llm.call(self.spec.text_system_prompt, transcription)
+            if translation:
+                body = f"{prefix}:\n{transcription}\n\n🌍 Translation:\n{translation}"
+            else:
+                body = f"{prefix}:\n{transcription}\n\n⚠️ Translation unavailable right now."
+            if caption:
+                cap_translation = self.llm.call(
+                    self.spec.text_system_prompt, caption
+                )
+                if cap_translation:
+                    body += (
+                        f"\n\n✉️ Caption:\n{caption}\n🌍 Caption translation:\n{cap_translation}"
+                    )
+                else:
+                    body += f"\n\n✉️ Caption:\n{caption}\n⚠️ Caption translation unavailable right now."
+            return body
+        # TRANSCRIBE_AND_REPLY: feed transcript (and caption) through the text prompt.
+        if caption:
+            combined = f"{transcription}\n\n[Caption sent with the media]: {caption}"
+        else:
+            combined = transcription
+        reply = self.llm.call(self.spec.text_system_prompt, combined)
+        head = f"{prefix}:\n{transcription}"
+        if caption:
+            head += f"\n\n✉️ Caption:\n{caption}"
         if not reply:
-            return f"{prefix}:\n{transcription}"
-        return f"{prefix}:\n{transcription}\n\n💬\n{reply}"
+            return head
+        return f"{head}\n\n💬\n{reply}"
 
     # ------------------------------------------------------------------
     # Sending
