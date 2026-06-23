@@ -295,7 +295,15 @@ class WhatsAppClient:
     # Media
     # ------------------------------------------------------------------
     def download_media(self, message_id: str, chat_jid: str, *, timeout: int = 30) -> Optional[bytes]:
-        """Trigger server-side decryption and return the decrypted media bytes."""
+        """Trigger server-side decryption and return the decrypted media bytes.
+
+        The gateway's ``/message/{id}/download`` collapses every failure cause
+        (message not found, no downloadable media, wrong chat, CDN fetch failed,
+        …) into a bare HTTP 500 whose only distinguishing detail is the response
+        body. We surface that body in both the log line and the error buffer so
+        the *reason* for a 500 is recoverable instead of a generic "Internal
+        Server Error".
+        """
         try:
             r = self.session.get(
                 f"{self.base_url}/message/{message_id}/download",
@@ -305,7 +313,11 @@ class WhatsAppClient:
             r.raise_for_status()
             data = r.json()
             if data.get("code") != "SUCCESS":
-                self._record_error(f"download/{message_id}", RuntimeError(data.get("message", "")))
+                self._record_error(
+                    f"download/{message_id}",
+                    RuntimeError(data.get("message", "")),
+                    status=r.status_code,
+                )
                 logger.error("Media download failed: %s", data.get("message"))
                 return None
             file_path = data.get("results", {}).get("file_path")
@@ -318,8 +330,22 @@ class WhatsAppClient:
             self._record_success()
             return r2.content
         except requests.RequestException as e:
-            self._record_error(f"download/{message_id}", e)
-            logger.error("download_media error: %s", e)
+            resp = getattr(e, "response", None)
+            status = getattr(resp, "status_code", None)
+            body = ""
+            if resp is not None:
+                try:
+                    body = resp.text[:500]
+                except Exception:  # pragma: no cover - defensive
+                    body = ""
+            detail = str(e)
+            if body:
+                detail = f"{detail} | gateway: {body}"
+            self._record_error(f"download/{message_id}", RuntimeError(detail), status=status)
+            logger.error(
+                "download_media(%s, phone=%s) failed: status=%s gateway_body=%s err=%s",
+                message_id, chat_jid, status, body or "(none)", e,
+            )
             return None
 
     # Convenience aliases
