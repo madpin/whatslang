@@ -18,6 +18,11 @@ import requests
 
 logger = logging.getLogger(__name__)
 
+_PERMANENT_MEDIA_FAILURE_MARKERS = (
+    "no url present",
+    "does not contain downloadable media",
+)
+
 
 def _jid_user(jid: str) -> str:
     if not jid:
@@ -36,6 +41,11 @@ def _first(d: dict, *keys: str, default: Any = None) -> Any:
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def _is_permanent_media_failure(detail: str) -> bool:
+    text = detail.lower()
+    return any(marker in text for marker in _PERMANENT_MEDIA_FAILURE_MARKERS)
 
 
 class WhatsAppClient:
@@ -342,7 +352,8 @@ class WhatsAppClient:
             if body:
                 detail = f"{detail} | gateway: {body}"
             self._record_error(f"download/{message_id}", RuntimeError(detail), status=status)
-            logger.error(
+            log = logger.warning if _is_permanent_media_failure(detail) else logger.error
+            log(
                 "download_media(%s, phone=%s) failed: status=%s gateway_body=%s err=%s",
                 message_id, chat_jid, status, body or "(none)", e,
             )

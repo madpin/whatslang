@@ -196,6 +196,10 @@ def _classify_for_bot(kind: str) -> Optional[str]:
     return None
 
 
+def _is_from_me(message: dict[str, Any]) -> bool:
+    return bool(message.get("is_from_me"))
+
+
 def _normalize_media(value: str) -> Optional[str]:
     v = value.lower()
     if "image" in v or "photo" in v:
@@ -329,7 +333,8 @@ class BotRunner:
         if not mid or self.db.is_processed(mid, self.spec.name):
             return False
         text = message.get("content", "")
-        if not text and _detect_media_type(message) is None:
+        media = _detect_media_type(message)
+        if not text and media is None:
             return False
         # Skip messages from bots (own device).
         sender = message.get("sender_jid") or message.get("from") or message.get("sender") or ""
@@ -339,9 +344,14 @@ class BotRunner:
         if text and text.startswith("[") and "]" in text[:20]:
             return False
         # Respect "answer owner messages" toggle.
-        if message.get("is_from_me"):
+        if _is_from_me(message):
             assignment = self.db.get_assignment(self.spec.name, self.chat_jid) or {}
             if not bool(assignment.get("answer_owner_messages", 1)):
+                return False
+            # GoWA can expose self-sent media rows without enough decryptable
+            # metadata for /message/{id}/download. Empty owner media would
+            # otherwise create a permanent gateway 500 on every fresh send.
+            if media and not text:
                 return False
         return True
 
@@ -369,6 +379,15 @@ class BotRunner:
     def _produce_response(self, message: dict[str, Any], text: str) -> Optional[str]:
         media = _detect_media_type(message)
         caption = (text or "").strip()
+        if media and _is_from_me(message):
+            if not caption:
+                return None
+            self._log.info(
+                "Treating caption on self-sent %s message %s as text only",
+                media,
+                message.get("id") or "",
+            )
+            media = None
         if media == "image" and self.spec.supports_image:
             return self._handle_image(message, caption)
         if media == "audio" and self.spec.supports_audio:

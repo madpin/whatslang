@@ -115,6 +115,7 @@ For each tick of `BotRunner._tick`:
    - empty *and* not media,
    - sent from another bot (start with `[…]`),
    - sent by us **and** `answer_owner_messages` is off,
+   - media-only messages sent by us (GoWA often cannot decrypt these rows),
    - sent by the bot's own device JID.
 4. **Resolve media** — for image messages, download via gateway. For
    audio, download then `LLMService.transcribe_audio`. For video,

@@ -147,6 +147,10 @@ or just delete and resync.
   vision-capable equivalent.
 - The gateway's `download_image` returned empty. Watch the logs — if
   it says `Couldn't download the image`, the gateway is the issue.
+- If the gateway says `failed to download media: no url present`, the
+  stored media row is not decryptable through GoWA. This commonly affects
+  media-only messages sent by the logged-in WhatsApp account; Whatslang
+  skips those rows and handles owner captions as text.
 
 ---
 

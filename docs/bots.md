@@ -116,7 +116,7 @@ Per `BotSpec`, the operator can change three things per chat:
 
 | Field | Default | Effect |
 |---|---|---|
-| `answer_owner_messages` | `True` | If `False`, the bot ignores messages where `is_from_me=true`. |
+| `answer_owner_messages` | `True` | If `False`, the bot ignores messages where `is_from_me=true`. Media-only owner messages are skipped even when this is `True` because GoWA commonly cannot decrypt self-sent media rows; owner captions are handled as text. |
 | `context_message_count` | `0` | If `> 0`, the runner fetches that many previous messages and passes them as a chat history list to the LLM. The history is built from `WhatsAppClient.get_messages`. |
 | `response_chat_jid` | `None` | If set, the bot forwards the original message **and** the reply to that JID instead of the source chat. |
 
