@@ -103,9 +103,17 @@ the same set.
   <img src="images/bot-lifecycle.svg" alt="Per-message bot pipeline">
 </p>
 
+Each runner holds a **source** client (the account it reads from) and a
+**target** client (the account it sends with). They're the same unless
+the assignment sets `source_device_id` / `target_device_id` — see
+[configuration.md#multiple-devices](configuration.md#multiple-devices).
+Both are lazily pooled by `WhatsAppGateway`, one `WhatsAppClient` per
+GoWA device id (`X-Device-Id`).
+
 For each tick of `BotRunner._tick`:
 
-1. **Poll** — `WhatsAppClient.get_messages(chat_jid, limit=20)`.
+1. **Poll** — `WhatsAppClient.get_messages(chat_jid, limit=20)` on the
+   *source* device.
 2. **First-run gate** — at startup, the runner *marks* the most recent
    20 messages as already processed so the bot doesn't re-flood the
    chat with answers to old messages. This only happens once per
@@ -126,13 +134,16 @@ For each tick of `BotRunner._tick`:
    as a chat history list to the LLM call.
 6. **Call the LLM** — `LLMService.call`,
    `LLMService.call_with_history`, or `LLMService.call_with_image`.
-7. **Send the reply** — prefix with `BotSpec.prefix`. Split into
-   ~3500-char chunks (with `1/N`, `2/N`, … numbering) if needed. Each
-   chunk is sent as a reply to the original message ID.
+7. **Send the reply** — on the *target* device, prefixed with
+   `BotSpec.prefix`. Split into ~3500-char chunks (with `1/N`, `2/N`, …
+   numbering) if needed. Each chunk is sent as a reply to the original
+   message ID **only when** it stays on the same device and chat (a
+   message id is scoped to the account that received it).
 8. **Optional redirect** — if `response_chat_jid` is set, the original
    message is forwarded to the redirect chat first
    (`[Fwd from <name>]: <preview>`), then the reply is sent there
-   (without `reply_message_id`).
+   (without `reply_message_id`). The forward and reply both go out on
+   the target device.
 9. **Mark processed** — write to `processed_messages`. Mostly
    text, length-clamped to 500 chars.
 

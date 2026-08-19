@@ -9,6 +9,7 @@ import type {
   ChatBrief,
   ChatListResponse,
   ChatWithBots,
+  DeviceInfo,
   Diagnostics,
   Stats,
   SystemInfo,
@@ -26,6 +27,10 @@ export const System = {
   stats: () => api.get<Stats>('/api/stats'),
   health: () => api.get<{ status: string }>('/api/health'),
   diagnostics: () => api.get<Diagnostics>('/api/diagnostics'),
+};
+
+export const Devices = {
+  list: () => api.get<DeviceInfo[]>('/api/devices'),
 };
 
 export const Bots = {
@@ -67,7 +72,10 @@ export const Chats = {
     api.post<Chat>('/api/chats', { chat_jid, chat_name }),
   delete: (chat_jid: string) =>
     api.delete<{ message: string }>(`/api/chats/${encodeURIComponent(chat_jid)}`),
-  sync: () => api.post<{ message: string }>('/api/chats/sync'),
+  sync: (device_id = '') =>
+    api.post<{ message: string }>('/api/chats/sync', undefined, {
+      query: device_id ? { device_id } : {},
+    }),
   bulk: (action: 'start_bots' | 'stop_bots' | 'delete_chats', chat_jids: string[]) =>
     api.post<{ message: string }>('/api/chats/bulk', { action, chat_jids }),
   messages: (chat_jid: string, limit = 20) =>

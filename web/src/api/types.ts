@@ -26,6 +26,14 @@ export interface BotStatus extends BotType {
   answer_owner_messages: boolean;
   context_message_count: number;
   response_chat_jid: string | null;
+  source_device_id: string | null;
+  target_device_id: string | null;
+}
+
+export interface DeviceInfo {
+  id: string;
+  label: string;
+  is_default: boolean;
 }
 
 export interface BotLogEntry {
@@ -95,6 +103,8 @@ export interface BotSettingsUpdate {
   answer_owner_messages?: boolean;
   context_message_count?: number;
   response_chat_jid?: string | null;
+  source_device_id?: string | null;
+  target_device_id?: string | null;
 }
 
 export interface GatewayDiagnostics {

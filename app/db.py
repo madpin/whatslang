@@ -79,6 +79,8 @@ class Database:
                     answer_owner_messages    INTEGER DEFAULT 1,
                     context_message_count    INTEGER DEFAULT 0,
                     response_chat_jid        TEXT,
+                    source_device_id         TEXT,
+                    target_device_id         TEXT,
                     created_at               TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (chat_jid) REFERENCES chats(chat_jid) ON DELETE CASCADE,
                     UNIQUE(bot_name, chat_jid)
@@ -134,6 +136,8 @@ class Database:
                 "ALTER TABLE bot_chat_assignments ADD COLUMN answer_owner_messages INTEGER DEFAULT 1",
                 "ALTER TABLE bot_chat_assignments ADD COLUMN context_message_count INTEGER DEFAULT 0",
                 "ALTER TABLE bot_chat_assignments ADD COLUMN response_chat_jid TEXT",
+                "ALTER TABLE bot_chat_assignments ADD COLUMN source_device_id TEXT",
+                "ALTER TABLE bot_chat_assignments ADD COLUMN target_device_id TEXT",
             ):
                 with contextlib.suppress(sqlite3.OperationalError):
                     conn.execute(stmt)
@@ -356,7 +360,14 @@ class Database:
     def upsert_assignment(self, bot_name: str, chat_jid: str, **fields: Any) -> bool:
         if not fields:
             return True
-        valid = {"running", "answer_owner_messages", "context_message_count", "response_chat_jid"}
+        valid = {
+            "running",
+            "answer_owner_messages",
+            "context_message_count",
+            "response_chat_jid",
+            "source_device_id",
+            "target_device_id",
+        }
         unknown = set(fields) - valid
         if unknown:
             raise ValueError(f"Unknown assignment fields: {unknown}")

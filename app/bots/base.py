@@ -233,14 +233,26 @@ class BotRunner:
         db: Database,
         chat_jid: str,
         bot_device_id: str,
+        target_whatsapp: Optional[WhatsAppClient] = None,
+        source_device_id: str = "",
+        target_device_id: str = "",
         poll_interval: int = 5,
     ):
         self.spec = spec
+        # ``whatsapp`` is the *source* client — the account we read the chat
+        # from. ``target_whatsapp`` is the account we send replies with; it
+        # defaults to the source so single-device setups are unchanged.
         self.whatsapp = whatsapp
+        self.target_whatsapp = target_whatsapp or whatsapp
         self.llm = llm
         self.db = db
         self.chat_jid = chat_jid
         self.bot_device_id = bot_device_id
+        self.source_device_id = source_device_id
+        self.target_device_id = target_device_id
+        # Quoting a message id only works when the reply goes back through the
+        # same account and chat that produced it.
+        self.same_device = source_device_id == target_device_id
         self.poll_interval = poll_interval
 
         self._exit = False
@@ -526,31 +538,39 @@ class BotRunner:
         forward_to = assignment.get("response_chat_jid") or None
         target = forward_to or self.chat_jid
 
-        # Forward original context if needed.
+        # Forward original context if needed. Sent with the *target* account
+        # (the reply device), which may differ from the one we read from.
         if forward_to:
             sender = message.get("push_name") or message.get("pushName") or "someone"
             preview = text or "[media]"
-            ok = self.whatsapp.send_message(forward_to, f"[Fwd from {sender}]: {preview}")
+            ok = self.target_whatsapp.send_message(forward_to, f"[Fwd from {sender}]: {preview}")
             if not ok:
                 self._log.error("Forward of original to %s failed", forward_to)
                 return
             time.sleep(0.4)
 
+        # A reply can only quote the original when it's going back to the same
+        # chat *and* through the same account (the message id is scoped to the
+        # account that observed it).
+        can_quote = not forward_to and self.same_device
         chunks = self._split_message(response)
         for i, chunk in enumerate(chunks, 1):
-            reply_id = mid if not forward_to else None
-            ok = self.whatsapp.send_message(target, chunk, reply_message_id=reply_id)
+            reply_id = mid if can_quote else None
+            ok = self.target_whatsapp.send_message(target, chunk, reply_message_id=reply_id)
             if not ok:
                 self._log.error("Failed to send chunk %d/%d for message %s", i, len(chunks), mid)
                 return
             time.sleep(0.4)
 
+        route = ""
+        if self.source_device_id != self.target_device_id:
+            route = f" via {self.source_device_id or 'default'}→{self.target_device_id or 'default'}"
         self.db.mark_processed(
             mid,
             self.spec.name,
             original_text=text,
             response_text=response[:500],
-            metadata=f"forwarded_to={forward_to}" if forward_to else "",
+            metadata=(f"forwarded_to={forward_to}" if forward_to else "") + route,
         )
         self._log.info("Replied to %s (%d chunks)", mid, len(chunks))
 

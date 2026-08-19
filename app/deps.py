@@ -10,7 +10,7 @@ from app.db import Database
 from app.security import is_valid_chat_jid
 from app.services.bot_manager import BotManager
 from app.services.llm import LLMService
-from app.services.whatsapp import WhatsAppClient
+from app.services.whatsapp import WhatsAppClient, WhatsAppGateway
 
 
 def settings_dep() -> Settings:
@@ -23,6 +23,10 @@ def get_db(request: Request) -> Database:
 
 def get_whatsapp(request: Request) -> WhatsAppClient:
     return request.app.state.whatsapp  # type: ignore[no-any-return]
+
+
+def get_gateway(request: Request) -> WhatsAppGateway:
+    return request.app.state.gateway  # type: ignore[no-any-return]
 
 
 def get_llm(request: Request) -> LLMService:

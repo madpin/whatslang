@@ -112,17 +112,21 @@ A few constraints worth knowing:
 
 ## Per-chat overrides (settings)
 
-Per `BotSpec`, the operator can change three things per chat:
+Per `BotSpec`, the operator can change these per chat:
 
 | Field | Default | Effect |
 |---|---|---|
 | `answer_owner_messages` | `True` | If `False`, the bot ignores messages where `is_from_me=true`. Media-only owner messages are skipped even when this is `True` because GoWA commonly cannot decrypt self-sent media rows; owner captions are handled as text. |
 | `context_message_count` | `0` | If `> 0`, the runner fetches that many previous messages and passes them as a chat history list to the LLM. The history is built from `WhatsAppClient.get_messages`. |
 | `response_chat_jid` | `None` | If set, the bot forwards the original message **and** the reply to that JID instead of the source chat. |
+| `source_device_id` | *(default device)* | Which configured device (GoWA account) the bot reads this chat from. See [configuration.md#multiple-devices](configuration.md#multiple-devices). |
+| `target_device_id` | *(= source)* | Which device sends the reply. Set it different from `source_device_id` to read on one account and write on another. |
 
 These come from `bot_chat_assignments`. The runner reads them on every
 message via `Database.get_assignment` — there's no caching, so changes
-take effect on the next poll cycle.
+take effect on the next poll cycle. The device fields only appear in the
+dashboard once more than one device is configured; an empty value means
+"default device" (source) / "same as source" (target).
 
 The settings modal in the dashboard maps directly to
 `PUT /api/bots/{name}/settings?chat_jid=…` (see [api.md](api.md)).

@@ -8,8 +8,17 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from app.config import Settings
 from app.db import Database
-from app.deps import get_bots, get_db, get_whatsapp, require_auth, valid_chat_jid_path
+from app.deps import (
+    get_bots,
+    get_db,
+    get_gateway,
+    get_whatsapp,
+    require_auth,
+    settings_dep,
+    valid_chat_jid_path,
+)
 from app.schemas import (
     AddChatRequest,
     BotStatus,
@@ -22,7 +31,17 @@ from app.schemas import (
     SimpleMessage,
 )
 from app.services.bot_manager import BotManager
-from app.services.whatsapp import WhatsAppClient
+from app.services.whatsapp import WhatsAppClient, WhatsAppGateway
+
+
+def _resolve_device_client(
+    gateway: WhatsAppGateway, settings: Settings, device_id: str
+) -> WhatsAppClient:
+    """Pick the gateway client for an optional ``device_id`` query param."""
+    did = (device_id or "").strip()
+    if did and did not in settings.device_id_set:
+        raise HTTPException(status_code=400, detail="Unknown device")
+    return gateway.get(did)
 
 logger = logging.getLogger(__name__)
 
@@ -153,10 +172,13 @@ def _lookup_friendly_name(whatsapp: WhatsAppClient, chat_jid: str) -> Optional[s
 
 @router.post("/sync", response_model=SimpleMessage)
 def sync_chats(
+    device_id: str = Query("", max_length=200, description="Optional device to sync from"),
     db: Database = Depends(get_db),
-    whatsapp: WhatsAppClient = Depends(get_whatsapp),
+    gateway: WhatsAppGateway = Depends(get_gateway),
+    settings: Settings = Depends(settings_dep),
     _: object = Depends(require_auth),
 ) -> SimpleMessage:
+    whatsapp = _resolve_device_client(gateway, settings, device_id)
     groups = whatsapp.get_groups(fetch_all=True)
     chats = whatsapp.get_chats(fetch_all=True)
     contacts = whatsapp.get_contacts(fetch_all=True)
@@ -272,9 +294,12 @@ def delete_chat(
 def chat_messages(
     chat_jid: str = Depends(valid_chat_jid_path),
     limit: int = Query(20, ge=1, le=100),
-    whatsapp: WhatsAppClient = Depends(get_whatsapp),
+    device_id: str = Query("", max_length=200, description="Optional device to read from"),
+    gateway: WhatsAppGateway = Depends(get_gateway),
+    settings: Settings = Depends(settings_dep),
     _: object = Depends(require_auth),
 ) -> dict:
+    whatsapp = _resolve_device_client(gateway, settings, device_id)
     messages = whatsapp.get_messages(chat_jid, limit=limit)
     return {"chat_jid": chat_jid, "messages": messages, "count": len(messages)}
 

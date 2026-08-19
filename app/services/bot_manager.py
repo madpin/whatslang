@@ -11,9 +11,10 @@ from typing import Any, Optional
 
 from app.bots import get_spec, list_specs
 from app.bots.base import BotRunner, BotSpec
+from app.config import DeviceConfig
 from app.db import Database
 from app.services.llm import LLMService
-from app.services.whatsapp import WhatsAppClient
+from app.services.whatsapp import WhatsAppGateway
 
 logger = logging.getLogger(__name__)
 
@@ -40,16 +41,19 @@ class _RingHandler(logging.Handler):
 class BotManager:
     def __init__(
         self,
-        whatsapp: WhatsAppClient,
+        gateway: WhatsAppGateway,
         llm: LLMService,
         db: Database,
-        bot_device_id: str,
+        *,
+        devices: list[DeviceConfig] | None = None,
+        default_device_id: str = "",
         poll_interval: int = 5,
     ):
-        self.whatsapp = whatsapp
+        self.gateway = gateway
         self.llm = llm
         self.db = db
-        self.bot_device_id = bot_device_id
+        self.default_device_id = default_device_id or gateway.default_device_id
+        self._self_jids = {d.id: d.self_jid for d in (devices or [])}
         self.poll_interval = poll_interval
 
         self._runners: dict[BotKey, BotRunner] = {}
@@ -57,6 +61,25 @@ class BotManager:
         self._handlers: dict[BotKey, _RingHandler] = {}
         self._started_at: dict[BotKey, float] = {}
         self._lock = threading.Lock()
+
+    # ------------------------------------------------------------------
+    # Device routing helpers
+    # ------------------------------------------------------------------
+    def _route_from_assignment(self, assignment: dict[str, Any]) -> tuple[str, str]:
+        """Resolve (source_device_id, target_device_id) from an assignment row.
+
+        A blank source falls back to the default device; a blank target
+        falls back to the source (reply on the same account you read from).
+        """
+        source_id = (assignment.get("source_device_id") or "").strip() or self.default_device_id
+        target_id = (assignment.get("target_device_id") or "").strip() or source_id
+        return source_id, target_id
+
+    def _route(self, bot_name: str, chat_jid: str) -> tuple[str, str]:
+        return self._route_from_assignment(self.db.get_assignment(bot_name, chat_jid) or {})
+
+    def _self_jid_for(self, device_id: str) -> str:
+        return self._self_jids.get(device_id) or (device_id if "@" in device_id else "")
 
     # ------------------------------------------------------------------
     # Catalog / status
@@ -79,6 +102,7 @@ class BotManager:
         running = key in self._runners
         assignment = self.db.get_assignment(bot_name, chat_jid) or {}
         uptime = int(time.time() - self._started_at[key]) if running and key in self._started_at else None
+        source_id, target_id = self._route_from_assignment(assignment)
         return {
             "name": spec.name,
             "label": spec.label,
@@ -91,6 +115,8 @@ class BotManager:
             "answer_owner_messages": bool(assignment.get("answer_owner_messages", 1)),
             "context_message_count": int(assignment.get("context_message_count", 0) or 0),
             "response_chat_jid": assignment.get("response_chat_jid"),
+            "source_device_id": source_id,
+            "target_device_id": target_id,
             "supports": {
                 "text": spec.supports_text,
                 "image": spec.supports_image,
@@ -122,13 +148,17 @@ class BotManager:
             if key in self._runners:
                 return True
 
+            source_id, target_id = self._route(bot_name, chat_jid)
             runner = BotRunner(
                 spec,
-                whatsapp=self.whatsapp,
+                whatsapp=self.gateway.get(source_id),
+                target_whatsapp=self.gateway.get(target_id),
                 llm=self.llm,
                 db=self.db,
                 chat_jid=chat_jid,
-                bot_device_id=self.bot_device_id,
+                bot_device_id=self._self_jid_for(source_id),
+                source_device_id=source_id,
+                target_device_id=target_id,
                 poll_interval=self.poll_interval,
             )
 

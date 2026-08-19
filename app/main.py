@@ -21,11 +21,12 @@ from app.logging_setup import configure_logging
 from app.routers import auth as auth_router
 from app.routers import bots as bots_router
 from app.routers import chats as chats_router
+from app.routers import devices as devices_router
 from app.routers import system as system_router
 from app.security import redact_error, safe_static_path
 from app.services.bot_manager import BotManager
 from app.services.llm import LLMService
-from app.services.whatsapp import WhatsAppClient
+from app.services.whatsapp import WhatsAppClient, WhatsAppGateway
 
 logger = logging.getLogger(__name__)
 
@@ -70,12 +71,19 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         raise RuntimeError(f"Missing required env vars: {', '.join(missing)}")
 
     db = Database(settings.db_path)
-    whatsapp = WhatsAppClient(
+    # One gateway, many devices (GoWA v8). Each device is a lazily-created
+    # ``WhatsAppClient`` scoped by ``X-Device-Id``. ``WhatsAppClient`` is
+    # referenced through this module's namespace so tests can patch it.
+    gateway = WhatsAppGateway(
         settings.whatsapp_base_url,
         username=settings.whatsapp_api_user,
         password=settings.whatsapp_api_password,
-        device_id=settings.device_id,
+        default_device_id=settings.default_device_id,
+        client_factory=WhatsAppClient,
     )
+    # Back-compat single client (default device) for diagnostics and the
+    # chat-list/friendly-name helpers that aren't bot-scoped.
+    whatsapp = gateway.default
     llm = LLMService(
         api_key=settings.openai_api_key,
         model=settings.openai_model,
@@ -84,10 +92,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         audio_model=settings.openai_audio_model,
     )
     bots = BotManager(
-        whatsapp=whatsapp,
+        gateway=gateway,
         llm=llm,
         db=db,
-        bot_device_id=settings.device_id,
+        devices=settings.resolved_devices,
+        default_device_id=settings.default_device_id,
         poll_interval=settings.poll_interval,
     )
 
@@ -118,6 +127,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     app.state.settings = settings
     app.state.db = db
+    app.state.gateway = gateway
     app.state.whatsapp = whatsapp
     app.state.llm = llm
     app.state.bots = bots
@@ -212,6 +222,7 @@ def create_app() -> FastAPI:
 
     app.include_router(auth_router.router)
     app.include_router(system_router.router)
+    app.include_router(devices_router.router)
     app.include_router(chats_router.router)
     app.include_router(bots_router.router)
 

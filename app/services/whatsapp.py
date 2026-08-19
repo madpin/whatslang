@@ -12,7 +12,7 @@ import logging
 import threading
 import time
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 import requests
 
@@ -400,3 +400,60 @@ class WhatsAppClient:
             if isinstance(v, str) and v.strip():
                 return v.strip()
         return None
+
+
+class WhatsAppGateway:
+    """A pool of per-device :class:`WhatsAppClient` instances.
+
+    With GoWA v8 one gateway hosts several WhatsApp accounts, each addressed
+    by the ``X-Device-Id`` header. Every device therefore shares the same
+    ``base_url`` and basic-auth credentials and differs only by its device
+    id. Clients are created lazily and cached so a bot reading device A and
+    another sending on device B reuse the same two connections.
+
+    ``client_factory`` is injectable so the app entrypoint can pass the
+    (test-patchable) :class:`WhatsAppClient` symbol from its own module.
+    """
+
+    def __init__(
+        self,
+        base_url: str,
+        username: str = "",
+        password: str = "",
+        *,
+        default_device_id: str = "",
+        client_factory: Optional[Callable[..., "WhatsAppClient"]] = None,
+    ):
+        self.base_url = base_url
+        self._username = username
+        self._password = password
+        self._default_device_id = default_device_id
+        self._factory: Callable[..., "WhatsAppClient"] = client_factory or WhatsAppClient
+        self._clients: dict[str, WhatsAppClient] = {}
+        self._lock = threading.Lock()
+
+    @property
+    def default_device_id(self) -> str:
+        return self._default_device_id
+
+    def get(self, device_id: str = "") -> "WhatsAppClient":
+        """Return (and cache) the client scoped to ``device_id``.
+
+        An empty ``device_id`` falls back to the configured default device,
+        which is the single-device / legacy behaviour (no ``X-Device-Id``
+        header when the default is also empty).
+        """
+        did = device_id or self._default_device_id
+        with self._lock:
+            if did not in self._clients:
+                self._clients[did] = self._factory(
+                    self.base_url,
+                    username=self._username,
+                    password=self._password,
+                    device_id=did,
+                )
+            return self._clients[did]
+
+    @property
+    def default(self) -> "WhatsAppClient":
+        return self.get(self._default_device_id)

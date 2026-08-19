@@ -55,6 +55,8 @@ class BotStatus(BaseModel):
     answer_owner_messages: bool = True
     context_message_count: int = 0
     response_chat_jid: Optional[str] = None
+    source_device_id: Optional[str] = None
+    target_device_id: Optional[str] = None
     supports: BotSupports
 
 
@@ -138,6 +140,10 @@ class BotSettingsUpdate(BaseModel):
     context_message_count: Optional[int] = Field(default=None, ge=0, le=10_000)
     # Empty string clears it; otherwise must be a real JID we already know.
     response_chat_jid: Optional[str] = Field(default=None, max_length=200)
+    # Device routing. Empty string resets to the default / source device;
+    # otherwise it must match a configured device (checked in the router).
+    source_device_id: Optional[str] = Field(default=None, max_length=200)
+    target_device_id: Optional[str] = Field(default=None, max_length=200)
 
     @field_validator("response_chat_jid")
     @classmethod
@@ -147,6 +153,12 @@ class BotSettingsUpdate(BaseModel):
         if not is_valid_chat_jid(v):
             raise ValueError("Invalid response_chat_jid")
         return v.strip()
+
+
+class DeviceInfo(BaseModel):
+    id: str
+    label: str
+    is_default: bool = False
 
 
 # ----- System ---------------------------------------------------------------

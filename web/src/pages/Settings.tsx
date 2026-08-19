@@ -6,10 +6,11 @@ import {
   Database,
   Lock,
   Server,
+  Smartphone,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-import { System } from '@/api/endpoints';
+import { Devices, System } from '@/api/endpoints';
 import { Badge } from '@/components/ui/Badge';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/Card';
 import { PageHeader } from '@/components/PageHeader';
@@ -17,6 +18,8 @@ import { useTheme } from '@/lib/theme';
 
 export function SettingsPage() {
   const sysQ = useQuery({ queryKey: ['system'], queryFn: () => System.info() });
+  const devicesQ = useQuery({ queryKey: ['devices'], queryFn: () => Devices.list() });
+  const devices = devicesQ.data ?? [];
   const { theme, setTheme } = useTheme();
 
   return (
@@ -88,6 +91,40 @@ export function SettingsPage() {
             label="Database"
             value={<code className="text-xs">{sysQ.data?.db_path ?? '—'}</code>}
           />
+        </CardBody>
+      </Card>
+
+      <Card className="mb-4">
+        <CardHeader>
+          <CardTitle>WhatsApp devices</CardTitle>
+          <Badge tone="gray">{devices.length || '—'}</Badge>
+        </CardHeader>
+        <CardBody className="space-y-3">
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            Accounts exposed by the GoWA gateway. Configure them with{' '}
+            <code className="text-xs">DEVICE_ID</code> /{' '}
+            <code className="text-xs">DEVICES</code>. Per-bot read/send routing
+            is set from a chat's bot settings.
+          </p>
+          {devices.length === 0 ? (
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              No devices configured.
+            </p>
+          ) : (
+            devices.map((d) => (
+              <Row
+                key={d.id}
+                icon={<Smartphone size={14} />}
+                label={d.label}
+                value={
+                  <span className="flex items-center gap-2">
+                    <code className="text-xs">{d.id}</code>
+                    {d.is_default ? <Badge tone="green">Default</Badge> : null}
+                  </span>
+                }
+              />
+            ))
+          )}
         </CardBody>
       </Card>
 

@@ -34,8 +34,10 @@ SESSION_SECRET=$(python -c 'import secrets; print(secrets.token_hex(32))')
 ```
 
 `DEVICE_ID` is the JID of the WhatsApp account the gateway is logged
-in as. It's used to detect "messages I sent". Leave blank to
-auto-detect from outgoing messages.
+in as. It's used to detect "messages I sent" and, on a GoWA v8
+gateway, as the `X-Device-Id` scoping value. Leave blank for a
+single-device gateway with no scoping. To use several accounts on one
+gateway, see [Multiple devices](#multiple-devices).
 
 ---
 
@@ -78,11 +80,48 @@ The gateway is a **separate** service you run yourself (e.g.
 | `WHATSAPP_BASE_URL` | *(empty)* | Base URL of your gateway, e.g. `http://localhost:8081`. **Required.** |
 | `WHATSAPP_API_USER` | *(empty)* | HTTP basic-auth username, if your gateway needs it. |
 | `WHATSAPP_API_PASSWORD` | *(empty)* | HTTP basic-auth password, if your gateway needs it. |
-| `DEVICE_ID` | *(empty)* | JID of the WhatsApp account the gateway is logged in as (e.g. `12345@s.whatsapp.net`). Used to recognise "self" messages. Leave blank for auto-detection from the first outgoing message we observe. |
+| `DEVICE_ID` | *(empty)* | Default device: the GoWA device id / `X-Device-Id` (e.g. `12345@s.whatsapp.net`). Used for un-scoped calls, as the default account bots read from, and to recognise "self" messages. Leave blank for a single-device gateway with no scoping. |
+| `DEVICES` | `[]` | JSON array of **extra** devices for a GoWA v8 multi-device gateway. See [Multiple devices](#multiple-devices). |
 
 If you can `curl ${WHATSAPP_BASE_URL}/chats` and get JSON back, the
 diagnostics page will say *"Gateway: reachable"* and your bots will
 work.
+
+#### Multiple devices
+
+GoWA v8 can host several WhatsApp accounts in one gateway instance,
+each addressed by the `X-Device-Id` header. Whatslang models each such
+account as a **device**. Devices are defined in configuration only
+(there is no add/QR flow in the dashboard — device login stays on
+GoWA):
+
+- `DEVICE_ID` — the default device (also the account used for the chat
+  list, diagnostics and un-routed bots).
+- `DEVICES` — a JSON array of additional devices. Each entry:
+  - `id` *(required)* — the `X-Device-Id` value (a label like `sales`
+    or a JID like `628…@s.whatsapp.net`).
+  - `label` *(optional)* — friendly name shown in the dashboard.
+  - `jid` *(optional)* — the account's own JID, used to detect "self"
+    messages. Defaults to `id` when `id` already looks like a JID.
+
+```dotenv
+DEVICE_ID=628111@s.whatsapp.net
+DEVICES=[{"id":"628222@s.whatsapp.net","label":"Work"},{"id":"628333@s.whatsapp.net","label":"Support"}]
+```
+
+Once more than one device is configured, each chat's **bot settings**
+in the dashboard expose two extra pickers:
+
+- **Read messages from** — which account this bot watches the chat on
+  (the *source* device).
+- **Send replies from** — which account sends the reply (the *target*
+  device); defaults to the source.
+
+Combined with the existing **Send replies to** chat picker, this lets a
+bot read a conversation on one account and write the response to a
+different chat on a *different* account. When the reply crosses devices
+(or goes to another chat) it isn't sent as a WhatsApp "quote", since a
+message id only exists on the account that received it.
 
 ### LLM (OpenAI / LiteLLM-compatible)
 
@@ -183,7 +222,7 @@ for that deployment.
 - `WHATSAPP_BASE_URL`
 - `WHATSAPP_API_USER`
 - `WHATSAPP_API_PASSWORD`
-- `DEVICE_ID`
+- `DEVICE_ID` (or at least one entry in `DEVICES`)
 - `OPENAI_API_KEY`
 
 If any are missing the app still **boots** (so you can hit

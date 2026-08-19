@@ -11,8 +11,36 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
-from pydantic import Field
+from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class DeviceConfig(BaseModel):
+    """One WhatsApp account exposed by the GoWA gateway.
+
+    With GoWA v8 a single gateway can host several accounts, each scoped by
+    the ``X-Device-Id`` header. ``id`` is that scoping value (a custom label
+    like ``sales`` or a JID like ``628...@s.whatsapp.net``). ``jid`` is the
+    account's own JID, used to recognise "messages I sent"; it defaults to
+    ``id`` when ``id`` already looks like a JID.
+    """
+
+    id: str
+    label: str = ""
+    jid: str = ""
+
+    @field_validator("id", "label", "jid")
+    @classmethod
+    def _strip(cls, v: str) -> str:
+        return v.strip()
+
+    @property
+    def display_label(self) -> str:
+        return self.label or self.id
+
+    @property
+    def self_jid(self) -> str:
+        return self.jid or (self.id if "@" in self.id else "")
 
 
 class Settings(BaseSettings):
@@ -54,7 +82,17 @@ class Settings(BaseSettings):
     whatsapp_base_url: str = ""
     whatsapp_api_user: str = ""
     whatsapp_api_password: str = ""
-    device_id: str = Field(default="", description="Bot device JID, used to detect own messages.")
+    device_id: str = Field(
+        default="",
+        description="Legacy single device JID / X-Device-Id. Becomes the default device.",
+    )
+    devices: list[DeviceConfig] = Field(
+        default_factory=list,
+        description=(
+            "Extra WhatsApp devices (GoWA multi-device). Set DEVICES to a JSON "
+            'array, e.g. [{"id":"sales","label":"Sales","jid":"628...@s.whatsapp.net"}].'
+        ),
+    )
 
     # --- LLM (OpenAI / LiteLLM compatible) -------------------------------
     openai_api_key: str = ""
@@ -90,16 +128,43 @@ class Settings(BaseSettings):
             return ["*"]
         return [o.strip() for o in self.allowed_origins.split(",") if o.strip()]
 
+    @property
+    def resolved_devices(self) -> list[DeviceConfig]:
+        """All configured devices, with the legacy ``DEVICE_ID`` folded in.
+
+        ``DEVICE_ID`` (when set) is the default device. If it isn't already
+        present in ``DEVICES`` it's prepended so it still shows up in the UI.
+        """
+        devs = list(self.devices)
+        if self.device_id and not any(d.id == self.device_id for d in devs):
+            devs.insert(0, DeviceConfig(id=self.device_id, label="Default"))
+        return devs
+
+    @property
+    def default_device_id(self) -> str:
+        """Device used for un-scoped calls and as the default read device."""
+        if self.device_id:
+            return self.device_id
+        return self.devices[0].id if self.devices else ""
+
+    @property
+    def device_id_set(self) -> set[str]:
+        return {d.id for d in self.resolved_devices}
+
     def required_missing(self) -> list[str]:
         """Return the list of required env vars that are missing."""
         required = {
             "WHATSAPP_BASE_URL": self.whatsapp_base_url,
             "WHATSAPP_API_USER": self.whatsapp_api_user,
             "WHATSAPP_API_PASSWORD": self.whatsapp_api_password,
-            "DEVICE_ID": self.device_id,
             "OPENAI_API_KEY": self.openai_api_key,
         }
-        return [k for k, v in required.items() if not v]
+        missing = [k for k, v in required.items() if not v]
+        # At least one device must be configured — via legacy DEVICE_ID or
+        # the DEVICES list.
+        if not self.resolved_devices:
+            missing.append("DEVICE_ID")
+        return missing
 
     # ------------------------------------------------------------------
     # Security gating

@@ -6,8 +6,9 @@ import re
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
 
+from app.config import Settings
 from app.db import Database
-from app.deps import get_bots, get_db, require_auth
+from app.deps import get_bots, get_db, require_auth, settings_dep
 from app.schemas import (
     BotLogEntry,
     BotLogs,
@@ -103,6 +104,7 @@ def update_settings(
     chat_jid: str = Depends(_valid_chat_jid_query),
     bots: BotManager = Depends(get_bots),
     db: Database = Depends(get_db),
+    settings: Settings = Depends(settings_dep),
     _: object = Depends(require_auth),
 ) -> BotStatus:
     if not bots.get_spec(bot_name):
@@ -122,6 +124,21 @@ def update_settings(
         if target and not db.get_chat(target):
             raise HTTPException(status_code=400, detail="Target chat not found")
         fields["response_chat_jid"] = target
+
+    # Device routing. An empty value resets to the default / source device;
+    # any non-empty value must match a configured device.
+    known = settings.device_id_set
+    for field_name, label in (
+        ("source_device_id", "source device"),
+        ("target_device_id", "target device"),
+    ):
+        value = getattr(payload, field_name)
+        if value is None:
+            continue
+        did = value.strip() or None
+        if did and did not in known:
+            raise HTTPException(status_code=400, detail=f"Unknown {label}")
+        fields[field_name] = did
 
     if fields:
         db.upsert_assignment(bot_name, chat_jid, **fields)

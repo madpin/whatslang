@@ -14,7 +14,7 @@ import {
   Trash2,
 } from 'lucide-react';
 
-import { Bots, Chats as ChatsAPI } from '@/api/endpoints';
+import { Bots, Chats as ChatsAPI, Devices } from '@/api/endpoints';
 import { ApiError } from '@/api/client';
 import type { BotStatus, BotType } from '@/api/types';
 import { Badge } from '@/components/ui/Badge';
@@ -23,6 +23,7 @@ import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
+import { Select } from '@/components/ui/Select';
 import { ChatPicker } from '@/components/ChatPicker';
 import { PageHeader } from '@/components/PageHeader';
 import { useToast } from '@/lib/toast';
@@ -403,6 +404,11 @@ function BotAssignmentRow({
             {bot.context_message_count} msg context
             {bot.answer_owner_messages ? ' · self-answer ON' : ''}
             {bot.response_chat_jid ? ' · custom destination' : ''}
+            {bot.source_device_id &&
+            bot.target_device_id &&
+            bot.source_device_id !== bot.target_device_id
+              ? ' · cross-device relay'
+              : ''}
           </p>
         </div>
       </div>
@@ -473,6 +479,15 @@ function BotSettingsModal({
   const [answerOwner, setAnswerOwner] = useState(bot.answer_owner_messages);
   const [contextCount, setContextCount] = useState(bot.context_message_count);
   const [responseChat, setResponseChat] = useState(bot.response_chat_jid ?? '');
+  const [sourceDevice, setSourceDevice] = useState(bot.source_device_id ?? '');
+  const [targetDevice, setTargetDevice] = useState(bot.target_device_id ?? '');
+
+  const devicesQ = useQuery({ queryKey: ['devices'], queryFn: () => Devices.list() });
+  const devices = devicesQ.data ?? [];
+  // Routing pickers are only meaningful once there's more than one account
+  // to read from / send with.
+  const multiDevice = devices.length >= 2;
+  const defaultDevice = devices.find((d) => d.is_default);
 
   const save = useMutation({
     mutationFn: () =>
@@ -480,6 +495,9 @@ function BotSettingsModal({
         answer_owner_messages: answerOwner,
         context_message_count: contextCount,
         response_chat_jid: responseChat || null,
+        ...(multiDevice
+          ? { source_device_id: sourceDevice || null, target_device_id: targetDevice || null }
+          : {}),
       }),
     onSuccess: () => {
       toast.show({ title: 'Settings saved', tone: 'success' });
@@ -538,6 +556,22 @@ function BotSettingsModal({
           max={50}
           onChange={(e) => setContextCount(parseInt(e.target.value || '0', 10))}
         />
+        {multiDevice ? (
+          <Select
+            label="Read messages from"
+            hint="Which WhatsApp account this bot watches this chat on."
+            value={sourceDevice}
+            onChange={(e) => setSourceDevice(e.target.value)}
+          >
+            <option value="">Default device ({defaultDevice?.label ?? '—'})</option>
+            {devices.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.label}
+                {d.is_default ? ' (default)' : ''}
+              </option>
+            ))}
+          </Select>
+        ) : null}
         <div>
           <label className="mb-1.5 block text-sm font-medium text-zinc-800 dark:text-zinc-100">
             Send replies to
@@ -552,6 +586,22 @@ function BotSettingsModal({
             Optionally redirect responses to a different chat (e.g. yourself).
           </p>
         </div>
+        {multiDevice ? (
+          <Select
+            label="Send replies from"
+            hint="Which account sends the reply. Pick another account to read here and write there."
+            value={targetDevice}
+            onChange={(e) => setTargetDevice(e.target.value)}
+          >
+            <option value="">Same as read device</option>
+            {devices.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.label}
+                {d.is_default ? ' (default)' : ''}
+              </option>
+            ))}
+          </Select>
+        ) : null}
       </div>
     </Modal>
   );
