@@ -142,6 +142,8 @@ def update_settings(
 
     if fields:
         db.upsert_assignment(bot_name, chat_jid, **fields)
+    if payload.source_device_id is not None or payload.target_device_id is not None:
+        bots.refresh_route(bot_name, chat_jid)
 
     status = bots.status(bot_name, chat_jid)
     if not status:

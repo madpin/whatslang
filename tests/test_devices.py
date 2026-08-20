@@ -208,3 +208,46 @@ def test_bot_settings_stores_known_device_routing(client: TestClient) -> None:
     assert body["source_device_id"] == "0000@s.whatsapp.net"
     # Target defaults to the source when left unset.
     assert body["target_device_id"] == "0000@s.whatsapp.net"
+
+
+def test_changing_device_route_reconfigures_running_bot(app_factory: Any, monkeypatch: Any) -> None:
+    class _DeviceWA:
+        def __init__(self, *_: Any, device_id: str = "", **__: Any) -> None:
+            self.device_id = device_id
+
+        def get_messages(self, *_: Any, **__: Any) -> list[dict[str, Any]]:
+            return []
+
+    monkeypatch.setattr("app.main.WhatsAppClient", _DeviceWA)
+    monkeypatch.setattr("app.main.LLMService", lambda *a, **k: None)
+    app = app_factory(DEVICES='[{"id":"personal","label":"Personal"}]')
+
+    with TestClient(app) as c:
+        c.post("/api/auth/login", json={"password": _PW})
+        chat_jid = "111@s.whatsapp.net"
+        app.state.db.add_chat(chat_jid, "Test")
+        started = c.post(
+            "/api/bots/translation/start", params={"chat_jid": chat_jid}
+        )
+        assert started.status_code == 200, started.text
+
+        key = ("translation", chat_jid)
+        original = app.state.bots._runners[key]
+        assert original.whatsapp.device_id == "0000@s.whatsapp.net"
+        original._first_run = False
+
+        updated = c.put(
+            "/api/bots/translation/settings",
+            params={"chat_jid": chat_jid},
+            json={
+                "source_device_id": "personal",
+                "target_device_id": "personal",
+            },
+        )
+        assert updated.status_code == 200, updated.text
+
+        reconfigured = app.state.bots._runners[key]
+        assert reconfigured is original
+        assert reconfigured.whatsapp.device_id == "personal"
+        assert reconfigured.target_whatsapp.device_id == "personal"
+        assert reconfigured._first_run is True

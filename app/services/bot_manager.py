@@ -138,6 +138,28 @@ class BotManager:
     # ------------------------------------------------------------------
     # Lifecycle
     # ------------------------------------------------------------------
+    def refresh_route(self, bot_name: str, chat_jid: str) -> bool:
+        source_id, target_id = self._route(bot_name, chat_jid)
+        with self._lock:
+            runner = self._runners.get((bot_name, chat_jid))
+            if runner is None:
+                return False
+            runner.configure_devices(
+                whatsapp=self.gateway.get(source_id),
+                target_whatsapp=self.gateway.get(target_id),
+                bot_device_id=self._self_jid_for(source_id),
+                source_device_id=source_id,
+                target_device_id=target_id,
+            )
+        logger.info(
+            "Updated %s route for %s: %s -> %s",
+            bot_name,
+            chat_jid,
+            source_id,
+            target_id,
+        )
+        return True
+
     def start(self, bot_name: str, chat_jid: str) -> bool:
         spec = get_spec(bot_name)
         if not spec:

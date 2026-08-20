@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.bots.base import BotRunner, BotSpec
+from app.services.whatsapp import WhatsAppClient
 
 
 class _DB:
@@ -81,6 +82,25 @@ def test_should_still_process_self_sent_text_when_owner_messages_enabled() -> No
                 "id": "text-1",
                 "type": "text",
                 "content": "hello",
+                "is_from_me": True,
+            }
+        )
+        is True
+    )
+
+
+def test_self_sent_text_is_not_filtered_by_matching_device_jid() -> None:
+    runner = _runner(answer_owner_messages=True)
+    runner.bot_device_id = "353834210235@s.whatsapp.net"
+    runner.whatsapp.is_bot_sender = WhatsAppClient.is_bot_sender  # type: ignore[method-assign]
+
+    assert (
+        runner._should_process(
+            {
+                "id": "text-personal-1",
+                "type": "text",
+                "content": "hello",
+                "sender_jid": "353834210235@s.whatsapp.net",
                 "is_from_me": True,
             }
         )

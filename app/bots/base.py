@@ -265,6 +265,25 @@ class BotRunner:
     def stop(self) -> None:
         self._exit = True
 
+    def configure_devices(
+        self,
+        *,
+        whatsapp: WhatsAppClient,
+        target_whatsapp: WhatsAppClient,
+        bot_device_id: str,
+        source_device_id: str,
+        target_device_id: str,
+    ) -> None:
+        source_changed = source_device_id != self.source_device_id
+        self.whatsapp = whatsapp
+        self.target_whatsapp = target_whatsapp
+        self.bot_device_id = bot_device_id
+        self.source_device_id = source_device_id
+        self.target_device_id = target_device_id
+        self.same_device = source_device_id == target_device_id
+        if source_changed:
+            self._first_run = True
+
     def run(self) -> None:
         self._log.info("Bot %s starting for chat %s", self.spec.name, self.chat_jid)
         while not self._exit:
@@ -350,7 +369,11 @@ class BotRunner:
             return False
         # Skip messages from bots (own device).
         sender = message.get("sender_jid") or message.get("from") or message.get("sender") or ""
-        if sender and self.whatsapp.is_bot_sender(sender, self.bot_device_id):
+        if (
+            sender
+            and not _is_from_me(message)
+            and self.whatsapp.is_bot_sender(sender, self.bot_device_id)
+        ):
             return False
         # Skip any message starting with a [..] bot prefix (avoid bot-on-bot loops).
         if text and text.startswith("[") and "]" in text[:20]:
